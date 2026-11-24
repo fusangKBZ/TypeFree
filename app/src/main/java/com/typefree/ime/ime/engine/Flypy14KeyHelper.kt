@@ -1,17 +1,18 @@
 package com.typefree.ime.ime.engine
 
 /**
- * Key definition for the 14-key QWERTY-merged Xiaohe Shuangpin layout:
- * Row 1: QW  ER  TY  UI  OP
- * Row 2: AS  DF  GH  JK  L
- * Row 3: ZX  CV  BN  M   (Backspace)
+ * Key definition for the iFlytek-proportioned 14-key QWERTY-merged Xiaohe Shuangpin layout:
+ * Row 1: QW(1) ER(2) TY(3) UI(4) OP(5)
+ * Row 2: AS(6) DF(7) GH(8) JK(9) L(0)
+ * Row 3: '     ZX(~) CV(!) BN(@) M(?)  ⌫
  */
 data class Flypy14KeySpec(
     val leftChar: Char,
     val leftHint: String,
     val rightChar: Char? = null,
     val rightHint: String = "",
-    val tapToken: Char
+    val tapToken: Char,
+    val topSymbol: String = ""
 ) {
     val isDual: Boolean get() = rightChar != null
     val primaryLabel: String
@@ -24,7 +25,7 @@ data class Flypy14KeySpec(
 
 /**
  * Pure Kotlin helper for 14-key Xiaohe Double Pinyin (`double_pinyin_flypy_14`):
- * - Defines the 14 keycaps with Xiaohe final / special-initial hints.
+ * - Defines the 14 keycaps with top swipe-up symbols and Xiaohe final / special-initial hints.
  * - Maps ambiguous dual-key tap tokens (`Q E T U O A D G J Z C B`) and exact lowercase keys (`a-z`).
  * - Matches valid Mandarin Xiaohe 2-key syllables for inline syllable filtering & locking.
  * - Formats Rime preedit + spelling hints into readable Pinyin.
@@ -33,24 +34,24 @@ object Flypy14KeyHelper {
 
     val KEY_ROWS: List<List<Flypy14KeySpec>> = listOf(
         listOf(
-            Flypy14KeySpec('q', "iu", 'w', "ei", 'Q'),
-            Flypy14KeySpec('e', "e", 'r', "uan", 'E'),
-            Flypy14KeySpec('t', "ue", 'y', "un", 'T'),
-            Flypy14KeySpec('u', "sh", 'i', "ch", 'U'),
-            Flypy14KeySpec('o', "uo", 'p', "ie", 'O')
+            Flypy14KeySpec('q', "iu", 'w', "ei", 'Q', "1"),
+            Flypy14KeySpec('e', "e", 'r', "uan", 'E', "2"),
+            Flypy14KeySpec('t', "ue", 'y', "un", 'T', "3"),
+            Flypy14KeySpec('u', "sh", 'i', "ch", 'U', "4"),
+            Flypy14KeySpec('o', "uo", 'p', "ie", 'O', "5")
         ),
         listOf(
-            Flypy14KeySpec('a', "a", 's', "ong·iong", 'A'),
-            Flypy14KeySpec('d', "ai", 'f', "en", 'D'),
-            Flypy14KeySpec('g', "eng", 'h', "ang", 'G'),
-            Flypy14KeySpec('j', "an", 'k', "ing·uai", 'J'),
-            Flypy14KeySpec('l', "iang·uang", null, "", 'l')
+            Flypy14KeySpec('a', "a", 's', "ong·iong", 'A', "6"),
+            Flypy14KeySpec('d', "ai", 'f', "en", 'D', "7"),
+            Flypy14KeySpec('g', "eng", 'h', "ang", 'G', "8"),
+            Flypy14KeySpec('j', "an", 'k', "ing·uai", 'J', "9"),
+            Flypy14KeySpec('l', "iang·uang", null, "", 'l', "0")
         ),
         listOf(
-            Flypy14KeySpec('z', "ou", 'x', "ia·ua", 'Z'),
-            Flypy14KeySpec('c', "ao", 'v', "zh·ui", 'C'),
-            Flypy14KeySpec('b', "in", 'n', "iao", 'B'),
-            Flypy14KeySpec('m', "ian", null, "", 'm')
+            Flypy14KeySpec('z', "ou", 'x', "ia·ua", 'Z', "~"),
+            Flypy14KeySpec('c', "ao", 'v', "zh·ui", 'C', "!"),
+            Flypy14KeySpec('b', "in", 'n', "iao", 'B', "@"),
+            Flypy14KeySpec('m', "ian", null, "", 'm', "?")
         )
     )
 

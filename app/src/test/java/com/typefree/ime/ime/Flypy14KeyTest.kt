@@ -133,6 +133,10 @@ class Flypy14KeyTest {
         assertEquals(26, coveredLetters.size)
         assertEquals(('a'..'z').toSet(), coveredLetters.toSet())
         assertEquals(12, dualTokens.size)
+        assertEquals(
+            listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "~", "!", "@", "?"),
+            allSpecs.map { it.topSymbol }
+        )
     }
 
     @Test
