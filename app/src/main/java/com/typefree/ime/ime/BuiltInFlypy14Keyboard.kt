@@ -1342,7 +1342,7 @@ fun BuiltInFlypy14KeyboardHost(
         backspaceSwipeUpClearEnabled = backspaceSwipeUpClearEnabled,
         onSwipeUpBackspaceClear = { onAction(ImeUiAction.ClearInputBox) },
         onEnterOrNewline = { onAction(ImeUiAction.EnterOrNewline) },
-        onSwitchSystemIme = { onAction(ImeUiAction.SwitchSystemIme) },
+        onSwitchSystemIme = { onAction(ImeUiAction.SwitchKeyboard) },
         inputSessionToken = uiState.inputSessionToken,
         showKeyPopupPreview = showKeyPopupPreview,
         onSwipeUpPeriodSlash = { onAction(ImeUiAction.SwipeUpPeriodSlash) },
