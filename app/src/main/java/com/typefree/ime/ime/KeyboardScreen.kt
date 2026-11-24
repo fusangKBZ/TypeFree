@@ -345,7 +345,8 @@ fun KeyboardScreen(
                                         onBlockCandidate = { onAction(ImeUiAction.BlockCandidate(it)) },
                                         isOrqDateActive = uiState.isOrqDateActive,
                                         orqDateOffsetDays = uiState.orqDateOffsetDays,
-                                        onStepOrqDate = { delta -> onAction(ImeUiAction.StepOrqDate(delta)) }
+                                        onStepOrqDate = { delta -> onAction(ImeUiAction.StepOrqDate(delta)) },
+                                        syllableFilterOptions = if (uiState.activeInputScheme == InputScheme.RIME_DOUBLE_PINYIN_FLYPY_14) uiState.t9Syllables else emptyList(), onSelectSyllable = { onAction(ImeUiAction.SelectT9Syllable(it)) }
                                     )
                                 }
 
@@ -470,6 +471,8 @@ fun KeyboardScreen(
                                 uiState.tabMode == KeyboardTabMode.QWERTY -> {
                                     if (uiState.activeInputScheme == InputScheme.RIME_T9_PINYIN && uiState.isFlypyChineseMode) {
                                         BuiltInT9KeyboardHost(uiState, settings.qwertyKeyPopupPreview, onAction, settings.backspaceSwipeUpClearEnabled)
+                                    } else if (uiState.activeInputScheme == InputScheme.RIME_DOUBLE_PINYIN_FLYPY_14 && uiState.isFlypyChineseMode) {
+                                        BuiltInFlypy14KeyboardHost(uiState, settings.qwertyKeyPopupPreview, settings.flypyCommaPeriodQuickSelect, onAction, settings.backspaceSwipeUpClearEnabled)
                                     } else BuiltInQwertyKeyboard(
                                         enterActionInfo = uiState.resolveEnterActionInfo(LocalAppLanguage.current != AppLang.EN),
                                         isFlypyChineseMode = uiState.isFlypyChineseMode,
@@ -528,7 +531,8 @@ fun KeyboardScreen(
                                                 pinnedWordsForCurrentCode = uiState.pinnedWordsForCurrentCode,
                                                 onPinCandidate = { onAction(ImeUiAction.PinCandidate(it)) },
                                                 onUnpinCandidate = { onAction(ImeUiAction.UnpinCandidate(it)) },
-                                                onBlockCandidate = { onAction(ImeUiAction.BlockCandidate(it)) }
+                                                onBlockCandidate = { onAction(ImeUiAction.BlockCandidate(it)) },
+                                                syllableFilterOptions = if (uiState.activeInputScheme == InputScheme.RIME_DOUBLE_PINYIN_FLYPY_14) uiState.t9Syllables else emptyList(), onSelectSyllable = { onAction(ImeUiAction.SelectT9Syllable(it)) }
                                             )
                                         }
                                     }

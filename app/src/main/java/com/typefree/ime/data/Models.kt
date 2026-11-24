@@ -106,6 +106,13 @@ enum class InputScheme(
         defaultFixedOrder = false,
         rimeSchemaId = "double_pinyin_flypy"
     ),
+    RIME_DOUBLE_PINYIN_FLYPY_14(
+        label = "小鹤双拼（14 键）",
+        shortBadge = "14",
+        usesRime = true,
+        defaultFixedOrder = false,
+        rimeSchemaId = "double_pinyin_flypy_14"
+    ),
     FLYPY_TABLE(
         label = "小鹤音形（四码）",
         shortBadge = "鹤",

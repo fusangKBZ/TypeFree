@@ -157,17 +157,17 @@ jobs:
           ./gradlew ${{ steps.tasks.outputs.apk_task }} --no-daemon --stacktrace
           APK_PATH=$(find "${{ steps.tasks.outputs.apk_dir }}" -name "*.apk" | head -n 1)
           test -f "$APK_PATH"
-          cp "$APK_PATH" TypeFree-standard-debug.apk
-          sha256sum TypeFree-standard-debug.apk | tee TypeFree-standard-debug.apk.sha256
+          cp "$APK_PATH" TypeNeo-standard-debug.apk
+          sha256sum TypeNeo-standard-debug.apk | tee TypeNeo-standard-debug.apk.sha256
 
       - name: Upload Standard Debug APK & test reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: TypeFree-standard-debug-apk
+          name: TypeNeo-standard-debug-apk
           path: |
-            TypeFree-standard-debug.apk
-            TypeFree-standard-debug.apk.sha256
+            TypeNeo-standard-debug.apk
+            TypeNeo-standard-debug.apk.sha256
             app/build/reports/tests/
           if-no-files-found: ignore
           retention-days: 14

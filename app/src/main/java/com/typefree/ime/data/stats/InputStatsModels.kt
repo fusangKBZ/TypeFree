@@ -361,6 +361,7 @@ object SchemeStatsKeys {
             InputScheme.RIME_PINYIN.name -> "雾凇全拼"
             InputScheme.RIME_T9_PINYIN.name -> "九键拼音"
             InputScheme.RIME_DOUBLE_PINYIN_FLYPY.name -> "小鹤双拼"
+            InputScheme.RIME_DOUBLE_PINYIN_FLYPY_14.name -> "小鹤14键"
             InputScheme.RIME_CUSTOM.name -> "自定义码表"
             ENGLISH_DIRECT -> "英文直输"
             else -> key

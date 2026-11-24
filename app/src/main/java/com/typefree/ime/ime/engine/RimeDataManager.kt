@@ -200,6 +200,7 @@ class RimeDataManager(
             "rime_ice.schema.yaml",
             "t9.schema.yaml",
             "double_pinyin_flypy.schema.yaml",
+            "double_pinyin_flypy_14.schema.yaml",
             "flypy.schema.yaml"
         )
         val customSchemaFile = sharedDir.listFiles().orEmpty()
@@ -216,7 +217,7 @@ class RimeDataManager(
             if (!parsedId.isNullOrBlank()) return parsedId
         }
         val activeId = activeSchemaProfile.schemaId
-        if (activeId.isNotBlank() && activeId != "rime_ice" && activeId != "t9" && activeId != "double_pinyin_flypy") {
+        if (activeId.isNotBlank() && activeId != "rime_ice" && activeId != "t9" && activeId != "double_pinyin_flypy" && activeId != "double_pinyin_flypy_14") {
             return activeId
         }
         return if (hasXiaoheSchemaInstalled()) "flypy" else "custom"
@@ -261,6 +262,7 @@ class RimeDataManager(
             "rime_ice.schema.yaml",
             "t9.schema.yaml",
             "double_pinyin_flypy.schema.yaml",
+            "double_pinyin_flypy_14.schema.yaml",
             "flypy.schema.yaml"
         )
         val out = ArrayList<InstalledCustomSchema>()
@@ -993,7 +995,7 @@ class RimeDataManager(
      * on `rime_ice`, `double_pinyin_flypy`, and `t9` depending on whether [activeModelId] is installed.
      */
     fun syncGrammarPatches(activeModelId: String?) {
-        val targetSchemas = listOf("rime_ice", "double_pinyin_flypy", "t9")
+        val targetSchemas = listOf("rime_ice", "double_pinyin_flypy", "double_pinyin_flypy_14", "t9")
         val cleanId = activeModelId?.trim()?.takeIf { it.isNotEmpty() && File(sharedDir, "$it.gram").isFile }
         for (schema in targetSchemas) {
             val customFile = File(sharedDir, "$schema.custom.yaml")
@@ -1547,7 +1549,7 @@ class RimeDataManager(
         if (!primarySchemaId.isNullOrBlank() && primarySchemaId in discoveredIds) {
             orderedIds.add(primarySchemaId)
         }
-        for (builtinId in listOf("rime_ice", "t9", "double_pinyin_flypy", "flypy")) {
+        for (builtinId in listOf("rime_ice", "t9", "double_pinyin_flypy", "double_pinyin_flypy_14", "flypy")) {
             if (builtinId in discoveredIds) {
                 orderedIds.add(builtinId)
             }
@@ -1735,7 +1737,7 @@ class RimeDataManager(
         const val CUSTOM_SCHEMA_META_FILENAME = ".custom_schema_name"
         const val CUSTOM_SCHEMA_ID_FILENAME = ".custom_schema_id"
         const val BUILTIN_ASSETS_VERSION_FILENAME = ".builtin_assets_version"
-        const val BUILTIN_ASSETS_VERSION = "3.8.3-p0"
+        const val BUILTIN_ASSETS_VERSION = "3.8.4-flypy14"
 
         val OPENCC_ASSET_FILES = listOf(
             "opencc/s2tw.json",
@@ -1774,6 +1776,7 @@ class RimeDataManager(
             "rime_ice.schema.yaml",
             "t9.schema.yaml",
             "double_pinyin_flypy.schema.yaml",
+            "double_pinyin_flypy_14.schema.yaml",
             "rime_ice.dict.yaml",
             CHAR_DICT_RELATIVE_PATH,
             BASE_DICT_RELATIVE_PATH

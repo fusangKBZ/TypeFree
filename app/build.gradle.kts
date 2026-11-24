@@ -18,7 +18,7 @@ android {
     val appLabelSuffix = (project.findProperty("TYPEFREE_APP_LABEL_SUFFIX") as? String)?.trim().orEmpty()
 
     defaultConfig {
-        applicationId = "com.typefree.ime"
+        applicationId = "com.typeneo.ime"
         if (appIdSuffix.isNotEmpty()) {
             applicationIdSuffix = appIdSuffix
         }
@@ -28,9 +28,9 @@ android {
         versionName = appVersionName
         buildConfigField("boolean", "USE_PRIVATE_DICT", usePrivateDict.toString())
         buildConfigField("boolean", "IS_XIAOHE_FLAVOR", "false")
-        manifestPlaceholders["appLabel"] = if (appLabelSuffix.isNotEmpty()) "TypeFree $appLabelSuffix" else "@string/app_name"
-        manifestPlaceholders["imeLabel"] = if (appLabelSuffix.isNotEmpty()) "TypeFree $appLabelSuffix (AI Voice Keyboard)" else "@string/ime_name"
-        manifestPlaceholders["accessibilityLabel"] = if (appLabelSuffix.isNotEmpty()) "TypeFree $appLabelSuffix 悬浮语音胶囊" else "@string/accessibility_service_label"
+        manifestPlaceholders["appLabel"] = if (appLabelSuffix.isNotEmpty()) "TypeNeo $appLabelSuffix" else "@string/app_name"
+        manifestPlaceholders["imeLabel"] = if (appLabelSuffix.isNotEmpty()) "TypeNeo $appLabelSuffix (AI Voice Keyboard)" else "@string/ime_name"
+        manifestPlaceholders["accessibilityLabel"] = if (appLabelSuffix.isNotEmpty()) "TypeNeo $appLabelSuffix 悬浮语音胶囊" else "@string/accessibility_service_label"
 
         ndk {
             abiFilters += listOf("arm64-v8a")

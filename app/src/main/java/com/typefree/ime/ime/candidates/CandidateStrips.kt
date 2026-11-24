@@ -359,14 +359,23 @@ fun CandidateStrip(
     onBlockCandidate: (String) -> Unit = {},
     isOrqDateActive: Boolean = false,
     orqDateOffsetDays: Int = 0,
-    onStepOrqDate: ((Int) -> Unit)? = null
+    onStepOrqDate: ((Int) -> Unit)? = null,
+    syllableFilterOptions: List<String> = emptyList(),
+    onSelectSyllable: (String) -> Unit = {}
 ) {
     val palette = LocalTypeFreeKeyboardPalette.current
     val metrics = LocalKeyboardMetrics.current
     val scrollState = rememberScrollState()
+    var showSyllablePicker by remember { mutableStateOf(false) }
 
     LaunchedEffect(composingCode) {
         scrollState.scrollTo(0)
+    }
+
+    LaunchedEffect(composingCode, syllableFilterOptions) {
+        if (syllableFilterOptions.size <= 1) {
+            showSyllablePicker = false
+        }
     }
 
     LaunchedEffect(scrollState.value, scrollState.maxValue, hasMoreCandidates) {
@@ -382,7 +391,48 @@ fun CandidateStrip(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        if (candidates.isEmpty()) {
+        if (showSyllablePicker && syllableFilterOptions.size > 1) {
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .horizontalScroll(rememberScrollState()),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                syllableFilterOptions.forEachIndexed { idx, syl ->
+                    Box(
+                        modifier = Modifier
+                            .height(28.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (idx == 0) palette.capsuleSelectedBg else palette.keyCapBg)
+                            .border(
+                                width = 1.dp,
+                                color = if (idx == 0) TypeFreeEmerald.copy(alpha = 0.72f) else palette.keyBorder,
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                            .clickable {
+                                showSyllablePicker = false
+                                onSelectSyllable(syl)
+                            }
+                            .padding(horizontal = 10.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = syl,
+                            style = TextStyle(
+                                color = if (idx == 0) TypeFreeEmerald else palette.keyTextPrimary,
+                                fontSize = 13.sp,
+                                lineHeight = 15.sp,
+                                fontWeight = if (idx == 0) FontWeight.Bold else FontWeight.SemiBold,
+                                platformStyle = PlatformTextStyle(includeFontPadding = false)
+                            ),
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+        } else if (candidates.isEmpty()) {
             val emptyHint = when {
                 composingCode.all { it == '`' } -> "反查：输双拼查形(如 ji`) 或 输双形查音(如 `bo)"
                 inputScheme.usesRime -> "无匹配候选 · 按回车上屏编码或空格清屏"
@@ -477,6 +527,36 @@ fun CandidateStrip(
                         )
                     }
                 }
+            }
+        }
+
+        // 2.8 Optional inline Syllable Filter Toggle (`[音]`) for 14-key Xiaohe disambiguation
+        if (syllableFilterOptions.size > 1) {
+            Box(
+                modifier = Modifier
+                    .height(28.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (showSyllablePicker) palette.capsuleSelectedBg else palette.keyCapSecondaryBg)
+                    .border(
+                        width = 1.dp,
+                        color = if (showSyllablePicker) TypeFreeEmerald.copy(alpha = 0.72f) else palette.keyBorder,
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                    .clickable { showSyllablePicker = !showSyllablePicker }
+                    .padding(horizontal = 7.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = if (showSyllablePicker) "词" else "音",
+                    style = TextStyle(
+                        color = if (showSyllablePicker) TypeFreeEmerald else palette.keyTextPrimary,
+                        fontSize = 11.5.sp,
+                        lineHeight = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        platformStyle = PlatformTextStyle(includeFontPadding = false)
+                    ),
+                    maxLines = 1
+                )
             }
         }
 
@@ -698,7 +778,9 @@ fun CandidateGridOverlay(
     pinnedWordsForCurrentCode: Set<String> = emptySet(),
     onPinCandidate: (String) -> Unit = {},
     onUnpinCandidate: (String) -> Unit = {},
-    onBlockCandidate: (String) -> Unit = {}
+    onBlockCandidate: (String) -> Unit = {},
+    syllableFilterOptions: List<String> = emptyList(),
+    onSelectSyllable: (String) -> Unit = {}
 ) {
     val palette = LocalTypeFreeKeyboardPalette.current
     val vScroll = rememberScrollState()
@@ -718,6 +800,40 @@ fun CandidateGridOverlay(
             .padding(6.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
+        if (syllableFilterOptions.size > 1) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                syllableFilterOptions.forEachIndexed { idx, syl ->
+                    Box(
+                        modifier = Modifier
+                            .height(26.dp)
+                            .clip(RoundedCornerShape(7.dp))
+                            .background(if (idx == 0) palette.capsuleSelectedBg else palette.keyCapSecondaryBg)
+                            .border(
+                                width = 1.dp,
+                                color = if (idx == 0) TypeFreeEmerald.copy(alpha = 0.72f) else palette.keyBorder,
+                                shape = RoundedCornerShape(7.dp)
+                            )
+                            .clickable { onSelectSyllable(syl) }
+                            .padding(horizontal = 9.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = syl,
+                            color = if (idx == 0) TypeFreeEmerald else palette.keyTextPrimary,
+                            fontSize = 12.sp,
+                            fontWeight = if (idx == 0) FontWeight.Bold else FontWeight.SemiBold,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+        }
         Box(
             modifier = Modifier
                 .fillMaxWidth()

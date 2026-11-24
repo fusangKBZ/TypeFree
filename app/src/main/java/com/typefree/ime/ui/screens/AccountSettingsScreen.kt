@@ -1011,6 +1011,7 @@ private fun AppearanceAndPreferencesPane(
                             InputScheme.RIME_PINYIN to "全拼",
                             InputScheme.RIME_T9_PINYIN to "九键拼音",
                             InputScheme.RIME_DOUBLE_PINYIN_FLYPY to "小鹤双拼",
+                            InputScheme.RIME_DOUBLE_PINYIN_FLYPY_14 to "小鹤14键",
                             InputScheme.FLYPY_TABLE to "小鹤音形"
                         )
                     }

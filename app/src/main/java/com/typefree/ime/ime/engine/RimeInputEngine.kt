@@ -32,11 +32,21 @@ class RimeInputEngine(
     private var normalizedSnippets: List<SnippetEntry> = emptyList()
     private var currentRawCode: String = ""
     private var currentMaxCandidates: Int = DEFAULT_PAGE_SIZE
+    private data class Flypy14LockedSegment(
+        val lockedCode: String,
+        val origTokens: String,
+        val endIndex: Int
+    )
+
     private var t9PendingCommittedPrefix: String = ""
     private val t9LockedSegments: ArrayDeque<Pair<String, String>> = ArrayDeque()
+    private val flypy14LockedSegments: ArrayDeque<Flypy14LockedSegment> = ArrayDeque()
 
     private val isT9Mode: Boolean
         get() = inputScheme == InputScheme.RIME_T9_PINYIN
+
+    private val isFlypy14Mode: Boolean
+        get() = inputScheme == InputScheme.RIME_DOUBLE_PINYIN_FLYPY_14
 
     var lastCommittedText: String = ""
         private set
@@ -79,6 +89,7 @@ class RimeInputEngine(
         return when (scheme) {
             InputScheme.RIME_T9_PINYIN -> "t9"
             InputScheme.RIME_DOUBLE_PINYIN_FLYPY -> "double_pinyin_flypy"
+            InputScheme.RIME_DOUBLE_PINYIN_FLYPY_14 -> "double_pinyin_flypy_14"
             InputScheme.RIME_CUSTOM -> customSchemaIdProvider().ifBlank { "custom" }
             else -> "rime_ice"
         }
@@ -181,6 +192,9 @@ class RimeInputEngine(
      * Works both from the beginning of a sentence and after partial candidate selection.
      */
     fun lockT9Syllable(syllable: String, nowMillis: Long = System.currentTimeMillis()): EngineResult {
+        if (isFlypy14Mode) {
+            return lockFlypy14Syllable(syllable, nowMillis)
+        }
         if (!isT9Mode || currentRawCode.isEmpty()) return EngineResult.Consumed
         val cleanSyl = syllable.trim().lowercase().filter { it in 'a'..'z' }
         if (cleanSyl.isEmpty()) return EngineResult.Consumed
@@ -241,11 +255,65 @@ class RimeInputEngine(
         return EngineResult.Consumed
     }
 
+    /**
+     * Locks the first ambiguous 14-key Xiaohe slot into an explicit lowercase Xiaohe code
+     * (e.g. `"CAGO"` + `"zhong"` -> `"vs'GO"`, or `"vsGO"` + `"guo"` -> `"vs'go"`).
+     */
+    fun lockFlypy14Syllable(syllable: String, nowMillis: Long = System.currentTimeMillis()): EngineResult {
+        if (!isFlypy14Mode || currentRawCode.isEmpty()) return EngineResult.Consumed
+        val cleanSyl = syllable.trim().lowercase().filter { it in 'a'..'z' }
+        if (cleanSyl.isEmpty()) return EngineResult.Consumed
+
+        val rimeCtx = rimeBridge.getContext(currentMaxCandidates)
+        val (inCompPrefix, tailCode) = T9PinyinHelper.splitRimePreedit(rimeCtx.preedit)
+        val workCode = if (inCompPrefix.isNotEmpty()) {
+            t9PendingCommittedPrefix += inCompPrefix
+            flypy14LockedSegments.clear()
+            tailCode.replace(" ", "")
+        } else {
+            currentRawCode
+        }
+
+        val slot = Flypy14KeyHelper.findFirstAmbiguousSlot(workCode) ?: return EngineResult.Consumed
+        val replacement = Flypy14KeyHelper.resolveReplacementForSlot(cleanSyl, slot.rawTokens)
+            ?: return EngineResult.Consumed
+
+        val rawPrefix = workCode.substring(0, slot.startIndex)
+        val normalizedPrefix = if (rawPrefix.isNotEmpty() && !rawPrefix.endsWith('\'')) {
+            "$rawPrefix'"
+        } else {
+            rawPrefix
+        }
+        val rawSuffix = workCode.substring(slot.endIndexExclusive).trimStart('\'')
+        val rebuilt = buildString {
+            append(normalizedPrefix)
+            append(replacement)
+            if (rawSuffix.isNotEmpty()) {
+                append('\'')
+                append(rawSuffix)
+            }
+        }
+
+        flypy14LockedSegments.addLast(
+            Flypy14LockedSegment(
+                lockedCode = replacement,
+                origTokens = slot.rawTokens,
+                endIndex = normalizedPrefix.length + replacement.length
+            )
+        )
+        currentRawCode = rebuilt
+        rimeBridge.clearComposition()
+        rimeBridge.processKeyText(rebuilt)
+        syncState(nowMillis)
+        return EngineResult.Consumed
+    }
+
     override fun clear() {
         val wasComposing = currentRawCode.isNotEmpty() || t9PendingCommittedPrefix.isNotEmpty()
         currentRawCode = ""
         t9PendingCommittedPrefix = ""
         t9LockedSegments.clear()
+        flypy14LockedSegments.clear()
         currentMaxCandidates = DEFAULT_PAGE_SIZE
         if (!externalEnhancedSchemePredicate(inputScheme) || wasComposing) {
             rimeBridge.pageSize = DEFAULT_PAGE_SIZE
@@ -292,6 +360,46 @@ class RimeInputEngine(
                 }
                 // Auto-insert separator if appending a digit immediately after a locked letter syllable (e.g. "ni" + '4' -> "ni'4")
                 if (T9PinyinHelper.isT9Digit(ch) && currentRawCode.lastOrNull() in 'a'..'z') {
+                    currentRawCode += '\''
+                    rimeBridge.processKey('\''.code, 0)
+                }
+                currentRawCode += ch
+                rimeBridge.processKey(ch.code, 0)
+                val autoCommit = rimeBridge.getCommit()
+                if (!autoCommit.isNullOrEmpty()) {
+                    val afterCtx = rimeBridge.getContext(currentMaxCandidates)
+                    if (afterCtx.rawInput.isEmpty()) {
+                        val full = t9PendingCommittedPrefix + autoCommit
+                        clear()
+                        lastCommittedText = full
+                        return EngineResult.Commit(full, remainComposing = false)
+                    }
+                }
+                syncState(nowMillis)
+                return EngineResult.Consumed
+            }
+            val pushed = flush()
+            val out = pushed + ch
+            if (out.isNotBlank()) {
+                lastCommittedText = out
+            }
+            return EngineResult.Commit(out, remainComposing = false)
+        }
+
+        // 14-key Xiaohe Shuangpin mode: route ambiguous tap tokens (Q E T U O A D G J Z C B),
+        // exact lowercase swipe/solo letters (a-z), and delimiter `'` directly into Rime `double_pinyin_flypy_14`.
+        if (isFlypy14Mode) {
+            if (Flypy14KeyHelper.isFlypy14InputChar(ch) || (ch == '\'' && currentRawCode.isNotEmpty())) {
+                if (currentRawCode.length >= MAX_RIME_INPUT_LENGTH) {
+                    return EngineResult.Consumed
+                }
+                if (ch == '\'' && currentRawCode.endsWith('\'')) {
+                    return EngineResult.Consumed
+                }
+                if (ch != '\'' &&
+                    flypy14LockedSegments.lastOrNull()?.endIndex == currentRawCode.length &&
+                    currentRawCode.isNotEmpty()
+                ) {
                     currentRawCode += '\''
                     rimeBridge.processKey('\''.code, 0)
                 }
@@ -490,7 +598,7 @@ class RimeInputEngine(
 
     private fun onBackspace(nowMillis: Long): EngineResult {
         if (currentRawCode.isEmpty() && t9PendingCommittedPrefix.isEmpty()) return EngineResult.PassThrough
-        if (isT9Mode) {
+        if (isT9Mode || isFlypy14Mode) {
             return onT9Backspace(nowMillis)
         }
         if (currentRawCode.startsWith(";") || currentRawCode.startsWith("/")) {
@@ -541,10 +649,9 @@ class RimeInputEngine(
             return EngineResult.Consumed
         }
 
-        // 2. If the composition ends right on a locked left-rail syllable (no trailing digits after it),
-        // unlock that syllable back to its original T9 digits so accidental taps undo cleanly.
+        // 2. If the composition ends right on a locked syllable, unlock it back to its original tokens.
         val trimmedCode = currentRawCode.trimEnd('\'')
-        if (t9LockedSegments.isNotEmpty() && trimmedCode.isNotEmpty() && trimmedCode.last() in 'a'..'z') {
+        if (isT9Mode && t9LockedSegments.isNotEmpty() && trimmedCode.isNotEmpty() && trimmedCode.last() in 'a'..'z') {
             val (lockedSyl, origDigits) = t9LockedSegments.last()
             if (trimmedCode.endsWith(lockedSyl)) {
                 t9LockedSegments.removeLast()
@@ -557,12 +664,26 @@ class RimeInputEngine(
                 return EngineResult.Consumed
             }
         }
+        if (isFlypy14Mode && flypy14LockedSegments.isNotEmpty()) {
+            val lastLocked = flypy14LockedSegments.last()
+            if (trimmedCode.length == lastLocked.endIndex && trimmedCode.endsWith(lastLocked.lockedCode)) {
+                flypy14LockedSegments.removeLast()
+                val base = trimmedCode.dropLast(lastLocked.lockedCode.length)
+                val restored = base + lastLocked.origTokens
+                currentRawCode = restored
+                rimeBridge.clearComposition()
+                rimeBridge.processKeyText(restored)
+                syncState(nowMillis)
+                return EngineResult.Consumed
+            }
+        }
 
         // 3. Otherwise delete the trailing key from Rime; also prune an orphaned trailing `'` after a locked syllable.
         rimeBridge.processKey(RimeBridge.XK_BackSpace, 0)
         var afterCtx = rimeBridge.getContext(currentMaxCandidates)
         var nextRaw = afterCtx.rawInput.ifEmpty { currentRawCode.dropLast(1) }
-        if (nextRaw.endsWith('\'') && t9LockedSegments.isNotEmpty()) {
+        val hasLocked = t9LockedSegments.isNotEmpty() || flypy14LockedSegments.isNotEmpty()
+        if (nextRaw.endsWith('\'') && hasLocked) {
             rimeBridge.processKey(RimeBridge.XK_BackSpace, 0)
             afterCtx = rimeBridge.getContext(currentMaxCandidates)
             nextRaw = afterCtx.rawInput.ifEmpty { nextRaw.dropLast(1) }
@@ -602,7 +723,7 @@ class RimeInputEngine(
 
     private fun onEnter(): EngineResult {
         if (currentRawCode.isEmpty() && t9PendingCommittedPrefix.isEmpty()) return EngineResult.PassThrough
-        if (isT9Mode) {
+        if (isT9Mode || isFlypy14Mode) {
             val text = flush()
             return if (text.isNotEmpty()) {
                 EngineResult.Commit(text, remainComposing = false)
@@ -712,6 +833,54 @@ class RimeInputEngine(
                 T9PinyinHelper.matchLeadingSyllables(
                     unlockedDigits = unlockedDigits,
                     preferredLeadingSyllable = preferredSyl
+                )
+            } else {
+                emptyList()
+            }
+
+            _state.value = EngineState(
+                preedit = preeditStr,
+                rawCode = currentRawCode.ifEmpty { t9PendingCommittedPrefix },
+                candidates = engineCands,
+                hasMore = rimeCtx.hasMore,
+                isComposing = true,
+                t9Syllables = syllables
+            )
+            return
+        }
+        if (isFlypy14Mode) {
+            val rimeCtx = if (currentRawCode.isNotEmpty()) {
+                rimeBridge.getContext(currentMaxCandidates)
+            } else {
+                com.typefree.rime.RimeContextSnapshot()
+            }
+            val topComment = rimeCtx.candidates.firstOrNull()?.comment.orEmpty()
+            val engineCands = if (rimeCtx.candidates.isNotEmpty()) {
+                rimeCtx.candidates.map { rc ->
+                    FlypyCandidate(text = rc.text, codeHint = "")
+                }
+            } else if (t9PendingCommittedPrefix.isNotEmpty()) {
+                listOf(FlypyCandidate(text = t9PendingCommittedPrefix, codeHint = ""))
+            } else {
+                emptyList()
+            }
+            val preeditStr = Flypy14KeyHelper.formatFlypy14Preedit(
+                rimePreedit = rimeCtx.preedit.ifEmpty { currentRawCode },
+                topCandidateComment = topComment,
+                pendingCommittedPrefix = t9PendingCommittedPrefix
+            ).ifEmpty { currentRawCode }
+
+            val (_, tailCodeRaw) = T9PinyinHelper.splitRimePreedit(
+                rimeCtx.preedit.ifEmpty { currentRawCode }
+            )
+            val tailCode = tailCodeRaw.replace(" ", "")
+            val slot = Flypy14KeyHelper.findFirstAmbiguousSlot(tailCode)
+            val commentSyllables = topComment.trim().split(' ').filter { it.isNotBlank() }
+            val preferredSyl = if (slot != null) commentSyllables.getOrNull(slot.syllableIndex) else null
+            val syllables = if (slot != null) {
+                Flypy14KeyHelper.matchLeadingSyllables(
+                    tailCode = tailCode,
+                    preferredSyllable = preferredSyl
                 )
             } else {
                 emptyList()

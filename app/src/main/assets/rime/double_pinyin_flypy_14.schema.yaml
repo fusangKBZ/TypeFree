@@ -1,0 +1,147 @@
+# Rime schema - 雾凇拼音 · 小鹤双拼 14 键 (TypeNeo, based on iDvel/rime-ice)
+# encoding: utf-8
+
+schema:
+  schema_id: double_pinyin_flypy_14
+  name: 小鹤双拼（14键）
+  version: "1.0.0"
+  author:
+    - Dvel (rime-ice)
+    - TypeNeo
+  description: |
+    雾凇拼音 - 小鹤双拼 14 键布局（QW ER TY UI OP / AS DF GH JK L / ZX CV BN M）。
+    支持直接点按双键模糊整句输入、左右滑精确输入单字母、以及候选条内精确音节锁定。
+
+switches:
+  - name: ascii_mode
+    reset: 0
+    states: [ 中, Ａ ]
+  - name: ascii_punct
+    reset: 0
+    states: [ ¥, $ ]
+  - name: traditionalization
+    reset: 0
+    states: [ 简, 繁 ]
+
+engine:
+  processors:
+    - predictor
+    - ascii_composer
+    - recognizer
+    - key_binder
+    - speller
+    - punctuator
+    - selector
+    - navigator
+    - express_editor
+  segmentors:
+    - ascii_segmentor
+    - matcher
+    - abc_segmentor
+    - punct_segmentor
+    - fallback_segmentor
+  translators:
+    - predict_translator
+    - punct_translator
+    - script_translator
+  filters:
+    - uniquifier
+
+predictor:
+  db: predict.db
+  max_candidates: 8
+  max_iterations: 1
+
+translator:
+  dictionary: rime_ice
+  prism: double_pinyin_flypy_14
+  enable_user_dict: true
+  enable_word_completion: true
+  enable_completion: true
+  enable_sentence: true
+  max_sentences: 1
+  initial_quality: 1.2
+  spelling_hints: 8
+  preedit_format:
+    - xform/([jqxy])v/$1u/
+    - xform/([nl])v/$1v/
+    - xform/([nl])ue/$1ve/
+  comment_format:
+    - xform/([jqxy])v/$1u/
+    - xform/([nl])ue/$1ve/
+
+speller:
+  alphabet: zyxwvutsrqponmlkjihgfedcbaQETUOADGJZCB'
+  initials: zyxwvutsrqponmlkjihgfedcbaQETUOADGJZCB
+  delimiter: " '"
+  algebra:
+    - erase/^xx$/
+    - erase/^hm$/
+    - erase/^m$/
+    - erase/^n$/
+    - erase/^ng$/
+    - erase/^hng$/
+    - derive/^([jqxy])u$/$1v/
+    - derive/^([aoe])([ioun])$/$1$1$2/
+    - xform/^([aoe])(ng)?$/$1$1$2/
+    - xform/iu$/Ⓠ/
+    - xform/(.)ei$/$1Ⓦ/
+    - xform/uan$/Ⓡ/
+    - xform/[uv]e$/Ⓣ/
+    - xform/un$/Ⓨ/
+    - xform/^sh/Ⓤ/
+    - xform/^ch/Ⓘ/
+    - xform/^zh/Ⓥ/
+    - xform/uo$/Ⓞ/
+    - xform/ie$/Ⓟ/
+    - xform/(.)i?ong$/$1Ⓢ/
+    - xform/ing$|uai$/Ⓚ/
+    - xform/(.)ai$/$1Ⓓ/
+    - xform/(.)en$/$1Ⓕ/
+    - xform/(.)eng$/$1Ⓖ/
+    - xform/[iu]ang$/Ⓛ/
+    - xform/(.)ang$/$1Ⓗ/
+    - xform/ian$/Ⓜ/
+    - xform/(.)an$/$1Ⓙ/
+    - xform/(.)ou$/$1Ⓩ/
+    - xform/[iu]a$/Ⓧ/
+    - xform/iao$/Ⓝ/
+    - xform/(.)ao$/$1Ⓒ/
+    - xform/ui$/Ⓥ/
+    - xform/in$/Ⓑ/
+    - xlit/ⓆⓌⓇⓉⓎⓊⒾⓄⓅⓈⒹⒻⒼⒽⒿⓀⓁⓏⓍⒸⓋⒷⓃⓂ/qwrtyuiopsdfghjklzxcvbnm/
+    # Position-1 ambiguous dual-key tokens (Q=qw, E=er, T=ty, U=ui, O=op, A=as, D=df, G=gh, J=jk, Z=zx, C=cv, B=bn)
+    - derive/^[qw](.)$/Q$1/
+    - derive/^[er](.)$/E$1/
+    - derive/^[ty](.)$/T$1/
+    - derive/^[ui](.)$/U$1/
+    - derive/^[op](.)$/O$1/
+    - derive/^[as](.)$/A$1/
+    - derive/^[df](.)$/D$1/
+    - derive/^[gh](.)$/G$1/
+    - derive/^[jk](.)$/J$1/
+    - derive/^[zx](.)$/Z$1/
+    - derive/^[cv](.)$/C$1/
+    - derive/^[bn](.)$/B$1/
+    # Position-2 ambiguous dual-key tokens (combines with Position-1 to support tap+tap, swipe+tap, tap+swipe, and exact)
+    - derive/^(.)[qw]$/$1Q/
+    - derive/^(.)[er]$/$1E/
+    - derive/^(.)[ty]$/$1T/
+    - derive/^(.)[ui]$/$1U/
+    - derive/^(.)[op]$/$1O/
+    - derive/^(.)[as]$/$1A/
+    - derive/^(.)[df]$/$1D/
+    - derive/^(.)[gh]$/$1G/
+    - derive/^(.)[jk]$/$1J/
+    - derive/^(.)[zx]$/$1Z/
+    - derive/^(.)[cv]$/$1C/
+    - derive/^(.)[bn]$/$1B/
+
+punctuator:
+  import_preset: default
+
+key_binder:
+  import_preset: default
+
+recognizer:
+  import_preset: default

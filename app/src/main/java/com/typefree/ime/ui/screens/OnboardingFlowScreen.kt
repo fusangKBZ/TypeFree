@@ -137,6 +137,7 @@ private enum class OnboardingTypingChoice {
     PINYIN_26,
     PINYIN_T9,
     DOUBLE_FLYPY,
+    DOUBLE_FLYPY_14,
     CODETABLE
 }
 
@@ -571,6 +572,7 @@ fun OnboardingFlowScreen(
                                     OnboardingTypingChoice.PINYIN_26 -> applyBuiltinScheme(repository, rimeDataManager, InputScheme.RIME_PINYIN)
                                     OnboardingTypingChoice.PINYIN_T9 -> applyBuiltinScheme(repository, rimeDataManager, InputScheme.RIME_T9_PINYIN)
                                     OnboardingTypingChoice.DOUBLE_FLYPY -> applyBuiltinScheme(repository, rimeDataManager, InputScheme.RIME_DOUBLE_PINYIN_FLYPY)
+                                    OnboardingTypingChoice.DOUBLE_FLYPY_14 -> applyBuiltinScheme(repository, rimeDataManager, InputScheme.RIME_DOUBLE_PINYIN_FLYPY_14)
                                     OnboardingTypingChoice.CODETABLE -> {
                                         if (selectedPresetId != "__imported_zip__") {
                                             val preset = orderedPresets.firstOrNull { it.id == selectedPresetId }
@@ -1211,6 +1213,25 @@ private fun OnboardingStep2TypingScheme(
                         )
                         Text(
                             text = tr("两键一字 · 延续双拼肌肉记忆", "2-stroke Chinese syllable input for Shuangpin users", "兩鍵一字 · 延續雙拼肌肉記憶"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            )
+
+            MochiSelectCard(
+                selected = selectedChoice == OnboardingTypingChoice.DOUBLE_FLYPY_14,
+                onClick = { onSelectChoice(OnboardingTypingChoice.DOUBLE_FLYPY_14) },
+                headerContent = {
+                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text(
+                            text = tr("小鹤双拼（14 键）", "14-Key Flypy Shuangpin", "小鶴雙拼（14 鍵）"),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = tr("QWERTY 合并大键位 · 点按消歧 + 左右滑精确输入", "Merged 14-key grid with tap disambiguation & swipe exact input", "QWERTY 合併大鍵位 · 點按消歧 + 左右滑精確輸入"),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

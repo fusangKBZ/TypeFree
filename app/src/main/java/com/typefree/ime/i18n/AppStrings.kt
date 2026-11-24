@@ -136,6 +136,7 @@ object AppStrings {
             InputScheme.RIME_PINYIN -> pick(lang, "全拼（雾凇拼音）", "Full Pinyin (Rime Ice)", "全拼（霧凇拼音）")
             InputScheme.RIME_T9_PINYIN -> pick(lang, "九键拼音（雾凇 T9）", "9-Key Pinyin (T9)", "九鍵拼音（霧凇 T9）")
             InputScheme.RIME_DOUBLE_PINYIN_FLYPY -> pick(lang, "小鹤双拼（整句）", "Double Pinyin (Flypy)", "小鶴雙拼（整句）")
+            InputScheme.RIME_DOUBLE_PINYIN_FLYPY_14 -> pick(lang, "小鹤双拼（14 键）", "14-Key Flypy", "小鶴雙拼（14 鍵）")
             InputScheme.FLYPY_TABLE -> pick(lang, "小鹤音形（四码）", "Flypy Codetable (4-Code)", "小鶴音形（四碼）")
             InputScheme.RIME_CUSTOM -> pick(lang, "自定义 Rime 方案", "Custom Rime Schema", "自訂 Rime 方案")
         }
@@ -146,6 +147,7 @@ object AppStrings {
             InputScheme.RIME_PINYIN -> pick(lang, "拼", "PY", "拼")
             InputScheme.RIME_T9_PINYIN -> pick(lang, "九", "T9", "九")
             InputScheme.RIME_DOUBLE_PINYIN_FLYPY -> pick(lang, "拼", "DP", "拼")
+            InputScheme.RIME_DOUBLE_PINYIN_FLYPY_14 -> pick(lang, "14", "14", "14")
             InputScheme.FLYPY_TABLE -> pick(lang, "鹤", "FP", "鶴")
             InputScheme.RIME_CUSTOM -> pick(lang, "拼", "RM", "拼")
         }

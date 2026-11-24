@@ -229,6 +229,7 @@ object ChatScreenContextExtractor {
         "com.google.android.permissioncontroller",
         "com.android.packageinstaller",
         "com.typefree.ime",
+        "com.typeneo.ime",
         // Payment & Banking
         "com.eg.android.AlipayGphone",
         "com.unionpay",

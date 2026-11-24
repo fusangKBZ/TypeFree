@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">TypeFree</string>
-    <string name="ime_name">TypeFree (AI Voice Keyboard)</string>
+    <string name="app_name">TypeNeo</string>
+    <string name="ime_name">TypeNeo (AI Voice Keyboard)</string>
     <string name="ime_subtype_label">AI Voice &amp; Multilingual Keyboard</string>
     <string name="ime_subtype_label_zh_cn">Chinese (Simplified) &amp; AI Voice</string>
     <string name="ime_subtype_label_zh_tw">Chinese (Traditional) &amp; AI Voice</string>
     <string name="ime_subtype_label_en_us">English (US) &amp; AI Voice</string>
-    <string name="accessibility_service_label">TypeFree Voice Bubble</string>
-    <string name="accessibility_service_description">Displays the optional TypeFree floating voice capsule when a text field is focused, allowing you to insert on-device or BYOK AI-polished speech directly at the cursor. Never collects passwords or background screen content.</string>
+    <string name="accessibility_service_label">TypeNeo Voice Bubble</string>
+    <string name="accessibility_service_description">Displays the optional TypeNeo floating voice capsule when a text field is focused, allowing you to insert on-device or BYOK AI-polished speech directly at the cursor. Never collects passwords or background screen content.</string>
 </resources>

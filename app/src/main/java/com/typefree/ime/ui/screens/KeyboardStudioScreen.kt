@@ -107,7 +107,8 @@ fun resolveSchemeIsolationKind(
         }
         InputScheme.RIME_PINYIN,
         InputScheme.RIME_T9_PINYIN,
-        InputScheme.RIME_DOUBLE_PINYIN_FLYPY -> SchemeIsolationKind.PINYIN_OR_DOUBLE_PINYIN
+        InputScheme.RIME_DOUBLE_PINYIN_FLYPY,
+        InputScheme.RIME_DOUBLE_PINYIN_FLYPY_14 -> SchemeIsolationKind.PINYIN_OR_DOUBLE_PINYIN
     }
 }
 
@@ -146,9 +147,10 @@ fun KeyboardStudioScreen(
             InputScheme.FLYPY_TABLE -> SchemaArchetype.FIXED_YINXING
             InputScheme.RIME_PINYIN,
             InputScheme.RIME_T9_PINYIN,
-            InputScheme.RIME_DOUBLE_PINYIN_FLYPY -> SchemaArchetype.SENTENCE_PINYIN
+            InputScheme.RIME_DOUBLE_PINYIN_FLYPY,
+            InputScheme.RIME_DOUBLE_PINYIN_FLYPY_14 -> SchemaArchetype.SENTENCE_PINYIN
             InputScheme.RIME_CUSTOM -> {
-                if (activeProfile.schemaId != "rime_ice" && activeProfile.schemaId != "t9" && activeProfile.schemaId != "double_pinyin_flypy") {
+                if (activeProfile.schemaId != "rime_ice" && activeProfile.schemaId != "t9" && activeProfile.schemaId != "double_pinyin_flypy" && activeProfile.schemaId != "double_pinyin_flypy_14") {
                     activeProfile.archetype
                 } else if (hasCustomImported) {
                     SchemaArchetype.FIXED_SHAPECODE
@@ -398,6 +400,7 @@ private fun KeyboardSchemeAndLayoutPane(
                         InputScheme.RIME_PINYIN to tr("全拼", "Full Pinyin", "全拼"),
                         InputScheme.RIME_T9_PINYIN to tr("九键拼音", "9-Key T9", "九鍵拼音"),
                         InputScheme.RIME_DOUBLE_PINYIN_FLYPY to tr("小鹤双拼", "Double Pinyin", "小鶴雙拼"),
+                        InputScheme.RIME_DOUBLE_PINYIN_FLYPY_14 to tr("小鹤14键", "14-Key Flypy", "小鶴14鍵"),
                         InputScheme.FLYPY_TABLE to tr("小鹤音形", "Flypy 4-Code", "小鶴音形")
                     )
                     builtinItems.forEach { (scheme, label) ->
