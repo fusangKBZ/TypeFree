@@ -15,6 +15,7 @@ import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputMethodManager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -388,6 +389,13 @@ class TypeFreeInputMethodService : ComposeInputMethodService(), ImeHostCallbacks
         super.onFinishInputView(finishingInput)
     }
 
+    private fun hasInteractivePinyinOverhang(st: ImeUiState): Boolean {
+        return st.tabMode == KeyboardTabMode.QWERTY &&
+            st.isFlypyComposing &&
+            st.activeInputScheme == InputScheme.RIME_DOUBLE_PINYIN_FLYPY_14 &&
+            (st.t9Syllables.size > 1 || st.lockedSyllables.isNotEmpty())
+    }
+
     override fun onComputeInsets(outInsets: Insets?) {
         super.onComputeInsets(outInsets)
         if (outInsets == null) return
@@ -401,7 +409,13 @@ class TypeFreeInputMethodService : ComposeInputMethodService(), ImeHostCallbacks
             }
             return
         }
-        val floatingOverhangPx = (KeyboardMetrics.FLOATING_PREEDIT_OVERHANG_DP * resources.displayMetrics.density).toInt()
+        val hasPinyinOverhang = hasInteractivePinyinOverhang(_imeState.value)
+        val overhangDp = if (hasPinyinOverhang) {
+            KeyboardMetrics.PINYIN_OVERHANG_DP
+        } else {
+            KeyboardMetrics.FLOATING_PREEDIT_OVERHANG_DP
+        }
+        val floatingOverhangPx = (overhangDp * resources.displayMetrics.density).toInt()
         if (floatingOverhangPx > 0 && decorHeight > floatingOverhangPx) {
             val adjustedTop = KeyboardMetrics.computeFloatingOverhangContentTopInset(
                 baseContentTopInsets = outInsets.contentTopInsets,
@@ -410,7 +424,11 @@ class TypeFreeInputMethodService : ComposeInputMethodService(), ImeHostCallbacks
             )
             outInsets.contentTopInsets = adjustedTop
             outInsets.visibleTopInsets = adjustedTop
-            outInsets.touchableInsets = Insets.TOUCHABLE_INSETS_CONTENT
+            outInsets.touchableInsets = if (hasPinyinOverhang) {
+                Insets.TOUCHABLE_INSETS_FRAME
+            } else {
+                Insets.TOUCHABLE_INSETS_CONTENT
+            }
             outInsets.touchableRegion.setEmpty()
         }
     }
@@ -452,7 +470,12 @@ class TypeFreeInputMethodService : ComposeInputMethodService(), ImeHostCallbacks
                 isPasswordField = isAsciiPreferredField,
                 restarting = restarting
             )
-            if (sessionMode.tabMode == KeyboardTabMode.QWERTY && !typingController.isDictionaryLoaded) {
+            val effectiveTab = if (sessionMode.tabMode == KeyboardTabMode.VOICE) {
+                KeyboardTabMode.QWERTY
+            } else {
+                sessionMode.tabMode
+            }
+            if (effectiveTab == KeyboardTabMode.QWERTY && !typingController.isDictionaryLoaded) {
                 shouldEnsureFlypyDict = true
             }
             val currentPhase = prev.voicePhase
@@ -472,7 +495,7 @@ class TypeFreeInputMethodService : ComposeInputMethodService(), ImeHostCallbacks
             }
             prev.copy(
                 voicePhase = clearedPhase,
-                tabMode = sessionMode.tabMode,
+                tabMode = effectiveTab,
                 inputSessionToken = if (!restarting) prev.inputSessionToken + 1 else prev.inputSessionToken,
                 targetPackage = pkg,
                 targetAppName = appName,
@@ -655,6 +678,10 @@ class TypeFreeInputMethodService : ComposeInputMethodService(), ImeHostCallbacks
         val didPauseMedia by audioRecorder.didPauseExternalMedia.collectAsState()
         val configuration = LocalConfiguration.current
         val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        val hasPinyinOverhang = hasInteractivePinyinOverhang(uiState)
+        LaunchedEffect(hasPinyinOverhang) {
+            requestRefreshImeInsets()
+        }
 
         val effectiveShowNumberRow = settings.qwertyShowNumberRow &&
             uiState.activeInputScheme != InputScheme.RIME_DOUBLE_PINYIN_FLYPY_14 &&
@@ -799,6 +826,7 @@ class TypeFreeInputMethodService : ComposeInputMethodService(), ImeHostCallbacks
             ImeUiAction.ToggleFlypyLanguageMode -> typingController.toggleFlypyLanguageMode()
             is ImeUiAction.SelectFlypyCandidate -> typingController.selectFlypyCandidate(action.index)
             is ImeUiAction.SelectT9Syllable -> typingController.selectT9Syllable(action.syllable)
+            is ImeUiAction.UnlockFlypy14Syllable -> typingController.unlockFlypy14Syllable(action.index)
             ImeUiAction.ClearFlypyComposing -> typingController.clearFlypyComposing()
             ImeUiAction.FlushFlypyComposing -> typingController.flushFlypyComposing()
             ImeUiAction.ToggleFlypyCandidateSheet -> typingController.toggleFlypyCandidateSheet()
@@ -833,15 +861,16 @@ class TypeFreeInputMethodService : ComposeInputMethodService(), ImeHostCallbacks
     // -------------------------------------------------------------------------
 
     private fun selectTabMode(mode: KeyboardTabMode) {
+        val targetMode = if (mode == KeyboardTabMode.VOICE) KeyboardTabMode.QWERTY else mode
         val prevMode = _imeState.value.tabMode
-        if (prevMode == mode && !_imeState.value.isClipboardOpen && !_imeState.value.isToolPanelOpen) return
+        if (prevMode == targetMode && !_imeState.value.isClipboardOpen && !_imeState.value.isToolPanelOpen) return
 
         performKeyFeedback(strong = false)
-        if (mode == KeyboardTabMode.QWERTY && !typingController.isDictionaryLoaded) {
+        if (targetMode == KeyboardTabMode.QWERTY && !typingController.isDictionaryLoaded) {
             TypeFreeApp.instance.ensureFlypyDictionaryLoaded()
         }
 
-        if (prevMode == KeyboardTabMode.QWERTY && mode != KeyboardTabMode.QWERTY) {
+        if (prevMode == KeyboardTabMode.QWERTY && targetMode != KeyboardTabMode.QWERTY) {
             typingController.resetComposing()
             tryAutoLearnFromRecentEdit()
         } else {
@@ -851,12 +880,12 @@ class TypeFreeInputMethodService : ComposeInputMethodService(), ImeHostCallbacks
         voiceController.stopRecordingOnTabSwitchOrWindowHidden()
 
         if (!ImeLogic.isPasswordEditorInputType(_imeState.value.currentInputType)) {
-            repository.updateSettings { it.copy(lastKeyboardTab = mode.name) }
+            repository.updateSettings { it.copy(lastKeyboardTab = targetMode.name) }
         }
 
         _imeState.update { prev ->
             prev.copy(
-                tabMode = mode,
+                tabMode = targetMode,
                 voicePhase = if (prev.voicePhase is VoicePhase.Recording) VoicePhase.Idle else prev.voicePhase,
                 voiceSubPanel = VoiceSubPanel.NONE,
                 capturedChatContext = CapturedChatContext(),

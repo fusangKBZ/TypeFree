@@ -106,7 +106,7 @@ data class InitialKeyboardResolution(
 
 data class ImeUiState(
     val voicePhase: VoicePhase = VoicePhase.Idle,
-    val tabMode: KeyboardTabMode = KeyboardTabMode.VOICE,
+    val tabMode: KeyboardTabMode = KeyboardTabMode.QWERTY,
     val inputSessionToken: Int = 0,
     val voiceSubPanel: VoiceSubPanel = VoiceSubPanel.NONE,
     val activeIntentMode: VoiceIntentMode = VoiceIntentMode.DICTATE,
@@ -139,6 +139,7 @@ data class ImeUiState(
     val liveWriteStatus: LiveWriteUiStatus = LiveWriteUiStatus.INACTIVE,
     val preeditDisplay: String = "",
     val t9Syllables: List<String> = emptyList(),
+    val lockedSyllables: List<String> = emptyList(),
     val activeSyllable: String = "",
     val hasMoreCandidates: Boolean = false,
     val activeInputScheme: InputScheme = InputScheme.FLYPY_TABLE,

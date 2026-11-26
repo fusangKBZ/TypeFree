@@ -17,6 +17,7 @@ import com.typefree.ime.data.PipelineMode
 import com.typefree.ime.data.VoiceIntentMode
 import com.typefree.ime.data.stats.TokenFeatureKeys
 import com.typefree.ime.data.stats.TokenUsage
+import com.typefree.ime.data.SnippetMatcher
 import com.typefree.ime.i18n.AppStrings
 import com.typefree.ime.ime.jev.ChatTopology
 import com.typefree.ime.ime.jev.InputConnectionDraftTarget
@@ -41,6 +42,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.InterruptedIOException
 import java.net.ConnectException
@@ -1765,7 +1767,7 @@ class VoiceController(
                             )
                         }
                         val tailStart = System.currentTimeMillis()
-                        val streamRes = liveSession.finishAndAwaitFinal()
+                        val streamRes = liveSession.finishAndAwaitFinal(timeoutMs = 1200L)
                         tailWaitMs = (System.currentTimeMillis() - tailStart).coerceAtLeast(0L)
 
                         val streamErr = streamRes.exceptionOrNull()
@@ -2072,6 +2074,40 @@ class VoiceController(
                         )
                     )
                 }
+            },
+            onRawTranscriptReady = if (
+                resolvedIntent == VoiceIntentMode.DICTATE &&
+                composer == null &&
+                settings.liveWriteToEditor &&
+                effectiveSelected.isBlank()
+            ) { rawText ->
+                if (SnippetMatcher.matchVoiceTranscript(rawText, settings.snippets) == null) {
+                    withContext(host.scope.coroutineContext.minusKey(Job)) {
+                        if (activeComposer == null) {
+                            val anchor = resolveCurrentCursorAnchor()
+                            val instantComposer = StreamingComposer(
+                                editorBridge = InputConnectionEditorBridge { host.currentInputConnection() }
+                            )
+                            instantComposer.startSession(
+                                anchorCursor = anchor,
+                                smartDirectMode = false
+                            )
+                            instantComposer.onRecordingFinished(
+                                finalRawTranscript = rawText,
+                                needsPolishing = true
+                            )
+                            activeComposer = instantComposer
+                            host.stateFlow.update { curr ->
+                                curr.copy(
+                                    liveWriteStatus = instantComposer.uiStatus,
+                                    voicePhase = VoicePhase.Processing(stageText = "已先上屏 · 润色中…")
+                                )
+                            }
+                        }
+                    }
+                }
+            } else {
+                null
             }
         )
 

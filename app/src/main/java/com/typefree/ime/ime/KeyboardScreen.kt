@@ -42,6 +42,7 @@ import com.typefree.ime.i18n.LocalAppLanguage
 import com.typefree.ime.ime.candidates.CandidateGridOverlay
 import com.typefree.ime.ime.candidates.CandidateStrip
 import com.typefree.ime.ime.candidates.FloatingPreeditCapsule
+import com.typefree.ime.ime.candidates.Flypy14PinyinOverhangBar
 import com.typefree.ime.ime.candidates.PredictionCandidateBar
 import com.typefree.ime.ime.chrome.ErrorContextBanner
 import com.typefree.ime.ime.chrome.InlineStyleSelectorStrip
@@ -179,16 +180,18 @@ fun KeyboardScreen(
             .fillMaxWidth()
             .alpha(if (uiState.isFullScreenPeekCapturing) 0f else 1f)
     ) {
-        // Transparent 28.dp Floating Preedit Overhang above the 1.dp keyboard top divider
-        // (`onComputeInsets` offsets `contentTopInsets` by 28.dp so host app keeps full 252.dp viewport)
+        // Top overhang above the 1.dp divider: 14-key interactive Pinyin row (36.dp) or Preedit Capsule (28.dp)
+        val showPinyinOverhang = !uiState.isFullScreenPeekCapturing && isActiveQwertyGrid && uiState.isFlypyComposing && uiState.activeInputScheme == InputScheme.RIME_DOUBLE_PINYIN_FLYPY_14 && (uiState.t9Syllables.size > 1 || uiState.lockedSyllables.isNotEmpty())
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(KeyboardMetrics.FLOATING_PREEDIT_OVERHANG_DP.dp)
+                .height((if (showPinyinOverhang) KeyboardMetrics.PINYIN_OVERHANG_DP else KeyboardMetrics.FLOATING_PREEDIT_OVERHANG_DP).dp)
                 .padding(start = 12.dp, end = 12.dp, bottom = 4.dp),
             contentAlignment = androidx.compose.ui.Alignment.BottomStart
         ) {
-            if (!uiState.isFullScreenPeekCapturing && isActiveQwertyGrid && uiState.isFlypyComposing) {
+            if (showPinyinOverhang) {
+                Flypy14PinyinOverhangBar(uiState.lockedSyllables, uiState.t9Syllables, { onAction(ImeUiAction.SelectT9Syllable(it)) }, { onAction(ImeUiAction.UnlockFlypy14Syllable(it)) })
+            } else if (!uiState.isFullScreenPeekCapturing && isActiveQwertyGrid && uiState.isFlypyComposing) {
                 FloatingPreeditCapsule(
                     composingCode = uiState.flypyComposingCode,
                     preeditDisplay = uiState.preeditDisplay,
@@ -390,7 +393,9 @@ fun KeyboardScreen(
                                         },
                                         onStartVoiceDictation = { onMicPressDown(VoiceIntentMode.DICTATE) },
                                         onStopVoiceDictation = onMicPressUp,
-                                        onOpenAskAiCard = { onAction(ImeUiAction.OpenAskAiCard) }
+                                        onOpenAskAiCard = { onAction(ImeUiAction.OpenAskAiCard) },
+                                        onShowImePicker = onShowImePicker,
+                                        onHideKeyboard = onHideKeyboard
                                     )
                                 }
                             }
@@ -439,36 +444,7 @@ fun KeyboardScreen(
                                     )
                                 }
 
-                                uiState.tabMode == KeyboardTabMode.VOICE -> {
-                                    VoiceMainPanel(
-                                        uiState = uiState,
-                                        settings = settings,
-                                        amplitudeProvider = amplitudeProvider,
-                                        amplitudes = amplitudes,
-                                        elapsedMs = elapsedMs,
-                                        didPauseMedia = didPauseMedia,
-                                        onSwipeToTab = onSelectTabMode,
-                                        onVoicePenClick = onOpenHelpMeWrite,
-                                        onOpenJevCopilot = { onAction(ImeUiAction.OpenJevCopilot) },
-                                        onMicPressDown = { onMicPressDown(VoiceIntentMode.DICTATE) },
-                                        onMicPressUp = onMicPressUp,
-                                        onEnterArcTranslate = onEnterArcTranslate,
-                                        onUpdateArcTranslate = onUpdateArcTranslate,
-                                        onReleaseArcTranslate = onReleaseArcTranslate,
-                                        onFinishHandsFree = onFinishHandsFree,
-                                        onCancelRecording = onCancelRecording,
-                                        onTogglePunctuationStrip = onTogglePunctuationStrip,
-                                        onCommitText = onCommitText,
-                                        onInsertPairedSymbol = onInsertPairedSymbol,
-                                        onBackspace = onBackspace,
-                                        onEnterOrNewline = onEnterOrNewline,
-                                        onHideKeyboard = onHideKeyboard,
-                                        onSwitchKeyboard = onSwitchKeyboard,
-                                        onShowImePicker = onShowImePicker
-                                    )
-                                }
-
-                                uiState.tabMode == KeyboardTabMode.QWERTY -> {
+                                uiState.tabMode != KeyboardTabMode.TRANSLATE -> {
                                     if (uiState.activeInputScheme == InputScheme.RIME_T9_PINYIN && uiState.isFlypyChineseMode) {
                                         BuiltInT9KeyboardHost(uiState, settings.qwertyKeyPopupPreview, onAction, settings.backspaceSwipeUpClearEnabled)
                                     } else if (uiState.activeInputScheme == InputScheme.RIME_DOUBLE_PINYIN_FLYPY_14 && uiState.isFlypyChineseMode) {
@@ -530,7 +506,7 @@ fun KeyboardScreen(
                                                 onPinCandidate = { onAction(ImeUiAction.PinCandidate(it)) },
                                                 onUnpinCandidate = { onAction(ImeUiAction.UnpinCandidate(it)) },
                                                 onBlockCandidate = { onAction(ImeUiAction.BlockCandidate(it)) },
-                                                syllableFilterOptions = if (uiState.activeInputScheme == InputScheme.RIME_DOUBLE_PINYIN_FLYPY_14) uiState.t9Syllables else emptyList(), activeSyllable = uiState.activeSyllable, onSelectSyllable = { onAction(ImeUiAction.SelectT9Syllable(it)) }, inputScheme = uiState.activeInputScheme, onClearCode = onClearFlypyComposing
+                                                syllableFilterOptions = if (uiState.activeInputScheme == InputScheme.RIME_DOUBLE_PINYIN_FLYPY_14) uiState.t9Syllables else emptyList(), lockedSyllables = if (uiState.activeInputScheme == InputScheme.RIME_DOUBLE_PINYIN_FLYPY_14) uiState.lockedSyllables else emptyList(), activeSyllable = uiState.activeSyllable, onSelectSyllable = { onAction(ImeUiAction.SelectT9Syllable(it)) }, onUnlockSyllable = { onAction(ImeUiAction.UnlockFlypy14Syllable(it)) }, inputScheme = uiState.activeInputScheme, onClearCode = onClearFlypyComposing
                                             )
                                         }
                                     }

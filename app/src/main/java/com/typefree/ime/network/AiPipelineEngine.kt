@@ -404,7 +404,8 @@ class AiPipelineEngine(
         chatContextScreenshotBase64: String = "",
         attitudeInstruction: String = "",
         editorDraft: String = "",
-        onStageChanged: (PipelineStage) -> Unit = {}
+        onStageChanged: (PipelineStage) -> Unit = {},
+        onRawTranscriptReady: (suspend (String) -> Unit)? = null
     ): Result<PipelineExecutionResult> = withContext(Dispatchers.IO) {
         val startMs = System.currentTimeMillis()
         val effectiveIntent = if (intentMode == VoiceIntentMode.SPEAK_TO_EDIT && selectedText.isBlank()) {
@@ -464,7 +465,8 @@ class AiPipelineEngine(
                     attitudeInstruction = attitudeInstruction,
                     editorDraft = editorDraft,
                     startMs = startMs,
-                    onStageChanged = onStageChanged
+                    onStageChanged = onStageChanged,
+                    onRawTranscriptReady = onRawTranscriptReady
                 )
             }
 
@@ -587,6 +589,7 @@ class AiPipelineEngine(
                         )
                     }
 
+                    onRawTranscriptReady?.invoke(rawTranscript)
                     onStageChanged(PipelineStage.POLISHING_LLM)
                     val llmStart = System.currentTimeMillis()
                     val chunks = if (effectiveIntent == VoiceIntentMode.DICTATE) {
@@ -841,7 +844,8 @@ class AiPipelineEngine(
         attitudeInstruction: String,
         editorDraft: String,
         startMs: Long,
-        onStageChanged: (PipelineStage) -> Unit
+        onStageChanged: (PipelineStage) -> Unit,
+        onRawTranscriptReady: (suspend (String) -> Unit)? = null
     ): Result<PipelineExecutionResult> {
         var asrUsedLocal = plan.asr is AsrRoute.Local
         var usedLiveStream = false
@@ -957,6 +961,7 @@ class AiPipelineEngine(
             }
 
             is TextRoute.Local -> {
+                onRawTranscriptReady?.invoke(rawTranscript)
                 onStageChanged(PipelineStage.POLISHING_LLM)
                 val llmStart = System.currentTimeMillis()
                 val localRes = runLocalSlmForVoiceIntent(
@@ -1070,6 +1075,7 @@ class AiPipelineEngine(
                         IllegalStateException(routeBlockMessage(RouteBlockReason.OFFLINE_ONLY_UNSUPPORTED_TASK, "纯离线锁已开启"))
                     )
                 }
+                onRawTranscriptReady?.invoke(rawTranscript)
                 onStageChanged(PipelineStage.POLISHING_LLM)
                 val llmStart = System.currentTimeMillis()
                 val cloudRes = executeCloudTextStageForVoice(

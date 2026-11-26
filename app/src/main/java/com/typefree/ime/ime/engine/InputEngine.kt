@@ -13,6 +13,7 @@ data class EngineState(
     val isOrqDateActive: Boolean = false,
     val orqDateOffsetDays: Int = 0,
     val t9Syllables: List<String> = emptyList(),
+    val lockedSyllables: List<String> = emptyList(),
     val activeSyllable: String = ""
 )
 

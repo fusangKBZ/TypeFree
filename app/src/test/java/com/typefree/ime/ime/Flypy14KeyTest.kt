@@ -251,33 +251,39 @@ class Flypy14KeyTest {
         assertEquals("zhong guo", state1.preedit)
         assertTrue("zhong" in state1.t9Syllables)
 
-        // Lock first ambiguous slot to "zhong" -> "vs'GO"; keep sibling pinyin selectable on the left
+        // Lock first ambiguous slot to "zhong" -> "vs'GO"; automatically advances to next syllable ("guo")
         engine.lockT9Syllable("zhong")
-        val stateLocked = engine.state.value
-        assertEquals("vs'GO", stateLocked.rawCode)
-        assertEquals("zhong", stateLocked.activeSyllable)
-        assertTrue(stateLocked.t9Syllables.containsAll(listOf("zhong", "cong", "zha", "ca")))
+        val stateLocked1 = engine.state.value
+        assertEquals("vs'GO", stateLocked1.rawCode)
+        assertEquals(listOf("zhong"), stateLocked1.lockedSyllables)
+        assertTrue("guo" in stateLocked1.t9Syllables)
 
-        // Re-select another left-rail pinyin "cong" -> swaps to "cs'GO" and updates right candidates
-        engine.lockT9Syllable("cong")
-        val stateCong = engine.state.value
-        assertEquals("cs'GO", stateCong.rawCode)
-        assertEquals("cong", stateCong.activeSyllable)
-        assertEquals("从过", stateCong.candidates.firstOrNull()?.text)
+        // Continuously lock second syllable "guo" -> "vs'go", ready to select whole phrase "中国"
+        engine.lockT9Syllable("guo")
+        val stateLocked2 = engine.state.value
+        assertEquals("vs'go", stateLocked2.rawCode)
+        assertEquals(listOf("zhong", "guo"), stateLocked2.lockedSyllables)
+        assertTrue(stateLocked2.t9Syllables.isEmpty())
+        assertEquals("中国", stateLocked2.candidates.firstOrNull()?.text)
 
-        // Re-select "zha" -> swaps to "va'GO"
-        engine.lockT9Syllable("zha")
-        val stateZha = engine.state.value
-        assertEquals("va'GO", stateZha.rawCode)
-        assertEquals("zha", stateZha.activeSyllable)
-        assertEquals("扎锅", stateZha.candidates.firstOrNull()?.text)
+        // Tapping locked syllable[1] ("guo") unlocks just the 2nd syllable back to "vs'GO"
+        engine.unlockFlypy14SyllableAt(1)
+        val stateUnlocked2 = engine.state.value
+        assertEquals("vs'GO", stateUnlocked2.rawCode)
+        assertEquals(listOf("zhong"), stateUnlocked2.lockedSyllables)
+        assertTrue("guo" in stateUnlocked2.t9Syllables)
 
-        // Switch back to "zhong", then backspace O, G -> "vs", then unlock "vs" -> "CA"
+        // Tapping locked syllable[0] ("zhong") unlocks back to "CA'GO" and restores 1st syllable options
+        engine.unlockFlypy14SyllableAt(0)
+        val stateUnlocked1 = engine.state.value
+        assertEquals(emptyList<String>(), stateUnlocked1.lockedSyllables)
+        assertTrue(stateUnlocked1.t9Syllables.containsAll(listOf("zhong", "cong", "zha", "ca")))
+
+        // Re-lock "zhong" -> "vs'GO", then backspace O, G -> "vs", then unlock "vs" -> "CA"
         engine.lockT9Syllable("zhong")
         engine.onKey(KeyInput.Backspace())
         engine.onKey(KeyInput.Backspace())
         assertEquals("vs", engine.state.value.rawCode)
-        assertEquals("", engine.state.value.activeSyllable)
         engine.onKey(KeyInput.Backspace())
         assertEquals("CA", engine.state.value.rawCode)
         assertEquals("中", engine.state.value.candidates.firstOrNull()?.text)
@@ -289,7 +295,7 @@ class Flypy14KeyTest {
     }
 
     @Test
-    fun partialSelection_clearsActiveSyllable_andAdvancesPinyinOptionsToNextSyllable() {
+    fun partialSelection_clearsLockedSyllables_andAdvancesPinyinOptionsToNextSyllable() {
         val client = FakeFlypy14RimeClient()
         val engine = RimeInputEngine(
             rimeBridge = client,
@@ -300,14 +306,14 @@ class Flypy14KeyTest {
             engine.onKey(KeyInput.CharKey(ch))
         }
         engine.lockT9Syllable("cong")
-        assertEquals("cong", engine.state.value.activeSyllable)
+        assertEquals(listOf("cong"), engine.state.value.lockedSyllables)
 
         // Partial selection (index 1 picks "从" while "GO" remains)
         val res = engine.select(1)
         assertEquals(EngineResult.Consumed, res)
         val afterPartial = engine.state.value
         assertTrue(afterPartial.isComposing)
-        assertEquals("", afterPartial.activeSyllable)
+        assertEquals(emptyList<String>(), afterPartial.lockedSyllables)
         assertEquals("过", afterPartial.candidates.firstOrNull()?.text)
         assertTrue("guo" in afterPartial.t9Syllables)
     }

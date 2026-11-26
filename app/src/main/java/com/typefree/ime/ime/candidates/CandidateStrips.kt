@@ -341,6 +341,130 @@ fun FloatingPreeditCapsule(
 }
 
 /**
+ * Dedicated top-row Pinyin selector bar above the 1.dp keyboard divider for 14-key Xiaohe:
+ * displays locked syllables (`[zhong ×]` clickable to unlock/re-pick) + remaining syllable options
+ * (`guo`, `huo`, `luo`...) across the full width so the main candidate row below is 100% words.
+ */
+@Composable
+fun Flypy14PinyinOverhangBar(
+    lockedSyllables: List<String>,
+    syllableOptions: List<String>,
+    onSelectSyllable: (String) -> Unit,
+    onUnlockSyllable: (Int) -> Unit
+) {
+    val palette = LocalTypeFreeKeyboardPalette.current
+    val emeraldText = if (palette.isDark) Color(0xFF6EE7B7) else Color(0xFF047857)
+    val rowScroll = rememberScrollState()
+    LaunchedEffect(lockedSyllables, syllableOptions) {
+        rowScroll.scrollTo(0)
+    }
+
+    val barShape = RoundedCornerShape(10.dp)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(32.dp)
+            .shadow(elevation = 2.dp, shape = barShape, clip = false)
+            .clip(barShape)
+            .background(palette.keyboardCanvas)
+            .border(1.dp, palette.keyBorder, barShape)
+            .horizontalScroll(rowScroll)
+            .padding(horizontal = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        lockedSyllables.forEachIndexed { idx, syl ->
+            Row(
+                modifier = Modifier
+                    .height(24.dp)
+                    .clip(RoundedCornerShape(7.dp))
+                    .background(palette.capsuleSelectedBg)
+                    .border(1.dp, TypeFreeEmerald.copy(alpha = 0.78f), RoundedCornerShape(7.dp))
+                    .clickable { onUnlockSyllable(idx) }
+                    .padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = syl,
+                    style = TextStyle(
+                        color = emeraldText,
+                        fontSize = 13.sp,
+                        lineHeight = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        platformStyle = PlatformTextStyle(includeFontPadding = false)
+                    ),
+                    maxLines = 1
+                )
+                Text(
+                    text = "×",
+                    style = TextStyle(
+                        color = emeraldText.copy(alpha = 0.85f),
+                        fontSize = 12.sp,
+                        lineHeight = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        platformStyle = PlatformTextStyle(includeFontPadding = false)
+                    ),
+                    maxLines = 1
+                )
+            }
+        }
+
+        if (lockedSyllables.isNotEmpty() && syllableOptions.isNotEmpty()) {
+            Box(
+                modifier = Modifier
+                    .width(1.dp)
+                    .height(16.dp)
+                    .background(palette.keyBorder)
+            )
+        }
+
+        syllableOptions.forEachIndexed { idx, syl ->
+            val isLead = lockedSyllables.isEmpty() && idx == 0
+            Box(
+                modifier = Modifier
+                    .height(24.dp)
+                    .clip(RoundedCornerShape(7.dp))
+                    .background(if (isLead) palette.capsuleSelectedBg else palette.keyCapBg)
+                    .border(
+                        width = 1.dp,
+                        color = if (isLead) TypeFreeEmerald.copy(alpha = 0.45f) else palette.keyBorder,
+                        shape = RoundedCornerShape(7.dp)
+                    )
+                    .clickable { onSelectSyllable(syl) }
+                    .padding(horizontal = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = syl,
+                    style = TextStyle(
+                        color = if (isLead) emeraldText else palette.keyTextPrimary,
+                        fontSize = 13.5.sp,
+                        lineHeight = 15.sp,
+                        fontWeight = if (isLead) FontWeight.Bold else FontWeight.SemiBold,
+                        platformStyle = PlatformTextStyle(includeFontPadding = false)
+                    ),
+                    maxLines = 1
+                )
+            }
+        }
+
+        if (syllableOptions.isEmpty() && lockedSyllables.isNotEmpty()) {
+            Text(
+                text = "点击拼音可重选",
+                style = TextStyle(
+                    color = palette.keyTextMuted,
+                    fontSize = 11.5.sp,
+                    lineHeight = 14.sp,
+                    platformStyle = PlatformTextStyle(includeFontPadding = false)
+                ),
+                maxLines = 1
+            )
+        }
+    }
+}
+
+/**
  * Spacious single-row `34.dp` Candidate Strip inside the constant `42.dp` top chrome slot
  * (paired with [FloatingPreeditCapsule] floating above the keyboard top edge):
  * - 1st candidate riveted at `X = 12.dp` (never pushed right by long pinyin),
@@ -374,14 +498,9 @@ fun CandidateStrip(
     val palette = LocalTypeFreeKeyboardPalette.current
     val metrics = LocalKeyboardMetrics.current
     val scrollState = rememberScrollState()
-    val sylScrollState = rememberScrollState()
 
-    LaunchedEffect(composingCode, preeditDisplay, candidates.firstOrNull()?.text, activeSyllable) {
+    LaunchedEffect(composingCode, preeditDisplay, candidates.firstOrNull()?.text, activeSyllable, syllableFilterOptions) {
         scrollState.scrollTo(0)
-    }
-
-    LaunchedEffect(syllableFilterOptions) {
-        sylScrollState.scrollTo(0)
     }
 
     LaunchedEffect(scrollState.value, scrollState.maxValue, hasMoreCandidates) {
@@ -397,54 +516,7 @@ fun CandidateStrip(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Left Pinyin filter zone + vertical divider (iFlytek style: left pinyin, right word candidates)
-        if (syllableFilterOptions.size > 1) {
-            Row(
-                modifier = Modifier
-                    .widthIn(max = 128.dp)
-                    .fillMaxHeight()
-                    .horizontalScroll(sylScrollState),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(5.dp)
-            ) {
-                syllableFilterOptions.forEachIndexed { idx, syl ->
-                    val isSelected = if (activeSyllable.isNotEmpty()) syl == activeSyllable else idx == 0
-                    Box(
-                        modifier = Modifier
-                            .height(32.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (isSelected) palette.capsuleSelectedBg else palette.keyCapBg)
-                            .border(
-                                width = 1.dp,
-                                color = if (isSelected) TypeFreeEmerald.copy(alpha = 0.78f) else palette.keyBorder,
-                                shape = RoundedCornerShape(8.dp)
-                            )
-                            .clickable { onSelectSyllable(syl) }
-                            .padding(horizontal = 9.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = syl,
-                            style = TextStyle(
-                                color = if (isSelected) TypeFreeEmerald else palette.keyTextPrimary,
-                                fontSize = 13.5.sp,
-                                lineHeight = 16.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
-                                platformStyle = PlatformTextStyle(includeFontPadding = false)
-                            ),
-                            maxLines = 1
-                        )
-                    }
-                }
-            }
-            Box(
-                modifier = Modifier
-                    .width(1.dp)
-                    .height(22.dp)
-                    .background(palette.keyBorder)
-            )
-        }
-
+        // 100% full row dedicated to word/character candidates (Pinyin row sits separately above the divider)
         if (candidates.isEmpty()) {
             val emptyHint = when {
                 composingCode.all { it == '`' } -> "反查：输双拼查形(如 ji`) 或 输双形查音(如 `bo)"
@@ -464,29 +536,6 @@ fun CandidateStrip(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
-        } else if (syllableFilterOptions.size > 1) {
-            Row(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .horizontalScroll(scrollState),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                candidates.take(40).forEachIndexed { idx, cand ->
-                    CandidateChipItem(
-                        index = idx,
-                        cand = cand,
-                        isFirst = idx == 0,
-                        codetableEnhancerActive = codetableEnhancerActive,
-                        isPinned = cand.text in pinnedWordsForCurrentCode,
-                        onClick = { onSelectCandidate(idx) },
-                        onPin = { onPinCandidate(cand.text) },
-                        onUnpin = { onUnpinCandidate(cand.text) },
-                        onBlock = { onBlockCandidate(cand.text) }
-                    )
-                }
-            }
         } else {
             // 1. Primary 1st candidate riveted at X = 12.dp (0px horizontal shift regardless of pinyin length)
             val firstCand = candidates.first()
@@ -502,7 +551,7 @@ fun CandidateStrip(
                 onBlock = { onBlockCandidate(firstCand.text) }
             )
 
-            // 2. Scrollable 2..N candidates
+            // 2. Scrollable 2..N candidates across remaining full width
             Row(
                 modifier = Modifier
                     .weight(1f)
@@ -785,15 +834,17 @@ fun CandidateGridOverlay(
     onUnpinCandidate: (String) -> Unit = {},
     onBlockCandidate: (String) -> Unit = {},
     syllableFilterOptions: List<String> = emptyList(),
+    lockedSyllables: List<String> = emptyList(),
     activeSyllable: String = "",
     onSelectSyllable: (String) -> Unit = {},
+    onUnlockSyllable: (Int) -> Unit = {},
     inputScheme: InputScheme = InputScheme.FLYPY_TABLE,
     onClearCode: (() -> Unit)? = null
 ) {
     val palette = LocalTypeFreeKeyboardPalette.current
     val vScroll = rememberScrollState()
 
-    LaunchedEffect(candidates.firstOrNull()?.text, syllableFilterOptions, activeSyllable) {
+    LaunchedEffect(candidates.firstOrNull()?.text, syllableFilterOptions, lockedSyllables, activeSyllable) {
         vScroll.scrollTo(0)
     }
 
@@ -818,8 +869,9 @@ fun CandidateGridOverlay(
                 .weight(1f),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            // Left vertical Pinyin rail (classic iFlytek Shuangpin disambiguation layout)
-            if (syllableFilterOptions.size > 1) {
+            // Left vertical Pinyin rail (shows locked syllables at top + next syllable options)
+            if (syllableFilterOptions.size > 1 || lockedSyllables.isNotEmpty()) {
+                val emeraldText = if (palette.isDark) Color(0xFF6EE7B7) else Color(0xFF047857)
                 Column(
                     modifier = Modifier
                         .width(76.dp)
@@ -830,17 +882,37 @@ fun CandidateGridOverlay(
                         .padding(4.dp),
                     verticalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
+                    lockedSyllables.forEachIndexed { idx, lockedSyl ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(34.dp)
+                                .clip(RoundedCornerShape(7.dp))
+                                .background(palette.capsuleSelectedBg)
+                                .border(1.dp, TypeFreeEmerald.copy(alpha = 0.78f), RoundedCornerShape(7.dp))
+                                .clickable { onUnlockSyllable(idx) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "$lockedSyl ×",
+                                color = emeraldText,
+                                fontSize = 13.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1
+                            )
+                        }
+                    }
                     syllableFilterOptions.forEachIndexed { idx, syl ->
-                        val isSelected = if (activeSyllable.isNotEmpty()) syl == activeSyllable else idx == 0
+                        val isLead = lockedSyllables.isEmpty() && idx == 0
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(38.dp)
                                 .clip(RoundedCornerShape(7.dp))
-                                .background(if (isSelected) palette.capsuleSelectedBg else palette.keyCapBg)
+                                .background(if (isLead) palette.capsuleSelectedBg else palette.keyCapBg)
                                 .border(
                                     width = 1.dp,
-                                    color = if (isSelected) TypeFreeEmerald.copy(alpha = 0.78f) else palette.keyBorder,
+                                    color = if (isLead) TypeFreeEmerald.copy(alpha = 0.55f) else palette.keyBorder,
                                     shape = RoundedCornerShape(7.dp)
                                 )
                                 .clickable { onSelectSyllable(syl) },
@@ -848,9 +920,9 @@ fun CandidateGridOverlay(
                         ) {
                             Text(
                                 text = syl,
-                                color = if (isSelected) TypeFreeEmerald else palette.keyTextPrimary,
+                                color = if (isLead) emeraldText else palette.keyTextPrimary,
                                 fontSize = 14.5.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                                fontWeight = if (isLead) FontWeight.Bold else FontWeight.SemiBold,
                                 maxLines = 1
                             )
                         }

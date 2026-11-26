@@ -289,15 +289,13 @@ fun TypeFreeTopBar(
     onOpenAskAiCard: () -> Unit = {},
     onToggleClipboard: () -> Unit = {},
     onStartVoiceDictation: () -> Unit = {},
-    onStopVoiceDictation: () -> Unit = {}
+    onStopVoiceDictation: () -> Unit = {},
+    onShowImePicker: () -> Unit = {},
+    onHideKeyboard: () -> Unit = {}
 ) {
     val palette = LocalTypeFreeKeyboardPalette.current
     val appLang = LocalAppLanguage.current
     val metrics = LocalKeyboardMetrics.current
-    val density = LocalDensity.current
-    val swipeThresholdPx = with(density) { 42.dp.toPx() }
-    val currentTab by rememberUpdatedState(uiState.tabMode)
-    val currentOnSelectTab by rememberUpdatedState(onSelectTabMode)
     val freshClip = if (settings.clipboardEnabled && settings.clipboardQuickPasteSuggestion) {
         uiState.freshClipboardBannerItem
     } else {
@@ -384,29 +382,7 @@ fun TypeFreeTopBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight()
-                .pointerInput(Unit) {
-                    awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = false)
-                        val start = down.position
-                        var last = start
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                            last = change.position
-                            if (!change.pressed) break
-                        }
-                        val next = ImeLogic.resolveNextTabByHorizontalSwipe(
-                            currentTab = currentTab,
-                            dragOffsetX = last.x - start.x,
-                            dragOffsetY = last.y - start.y,
-                            thresholdPx = swipeThresholdPx
-                        )
-                        if (next != null) {
-                            currentOnSelectTab(next)
-                        }
-                    }
-                },
+                .fillMaxHeight(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -726,76 +702,75 @@ fun TypeFreeTopBar(
         Spacer(modifier = Modifier.width(4.dp))
 
         // Right Cluster:
-        // - In QWERTY idle mode: clean top bar — no extra voice button or AI feature pills (Hold Spacebar for voice!).
-        // - In VOICE / TRANSLATE / ToolPanel mode: Compact 2-Segment Track [鹤 打字 | 文A]
-        if (!isQwertyRightCluster) {
+        // - In QWERTY idle mode: [🌐 Switch IME] + [⌨⌄ Hide Keyboard] (only voice entry is holding Spacebar!).
+        // - In TRANSLATE / ToolPanel mode: Compact 2-Segment Track [鹤 打字 | 文A] + [⌨⌄]
+        if (isQwertyRightCluster) {
             Row(
-                modifier = Modifier
-                    .height(34.dp)
-                    .clip(RoundedCornerShape(17.dp))
-                    .background(palette.capsuleTrackBg)
-                    .border(1.dp, palette.keyBorder, RoundedCornerShape(17.dp))
-                    .padding(2.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(2.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                if (uiState.tabMode != KeyboardTabMode.VOICE) {
+                TopBarImeSwitchButton(onClick = onShowImePicker)
+                TopBarHideKeyboardButton(onClick = onHideKeyboard)
+            }
+        } else {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .height(34.dp)
+                        .clip(RoundedCornerShape(17.dp))
+                        .background(palette.capsuleTrackBg)
+                        .border(1.dp, palette.keyBorder, RoundedCornerShape(17.dp))
+                        .padding(2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    val schemeBadge = if (uiState.isFlypyChineseMode) {
+                        AppStrings.inputSchemeShortBadge(uiState.activeInputScheme, appLang)
+                    } else {
+                        "EN"
+                    }
                     ModeSegmentItem(
-                        selected = false,
-                        width = 30.dp,
-                        onClick = { onSelectTabMode(KeyboardTabMode.VOICE) }
+                        selected = uiState.tabMode == KeyboardTabMode.QWERTY && !uiState.isToolPanelOpen,
+                        width = 52.dp,
+                        onClick = {
+                            if (uiState.tabMode == KeyboardTabMode.QWERTY && !uiState.isToolPanelOpen) {
+                                onToggleFlypyLanguageMode()
+                            } else {
+                                onSelectTabMode(KeyboardTabMode.QWERTY)
+                            }
+                        }
                     ) { contentColor ->
-                        Icon(
-                            imageVector = TypeFreeIcons.VoiceWaveform,
-                            contentDescription = "语音模式",
-                            tint = contentColor,
-                            modifier = Modifier.size(14.dp)
+                        Text(
+                            text = if (appLang == AppLang.EN) {
+                                if (uiState.isFlypyChineseMode) "$schemeBadge Type" else "ABC"
+                            } else {
+                                "$schemeBadge 打字"
+                            },
+                            color = contentColor,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
+                        )
+                    }
+
+                    ModeSegmentItem(
+                        selected = uiState.tabMode == KeyboardTabMode.TRANSLATE && !uiState.isToolPanelOpen,
+                        width = 34.dp,
+                        onClick = { onSelectTabMode(KeyboardTabMode.TRANSLATE) }
+                    ) { contentColor ->
+                        Text(
+                            text = "文A",
+                            color = contentColor,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1
                         )
                     }
                 }
-
-                val schemeBadge = if (uiState.isFlypyChineseMode) {
-                    AppStrings.inputSchemeShortBadge(uiState.activeInputScheme, appLang)
-                } else {
-                    "EN"
-                }
-                ModeSegmentItem(
-                    selected = uiState.tabMode == KeyboardTabMode.QWERTY && !uiState.isToolPanelOpen,
-                    width = 52.dp,
-                    onClick = {
-                        if (uiState.tabMode == KeyboardTabMode.QWERTY && !uiState.isToolPanelOpen) {
-                            onToggleFlypyLanguageMode()
-                        } else {
-                            onSelectTabMode(KeyboardTabMode.QWERTY)
-                        }
-                    }
-                ) { contentColor ->
-                    Text(
-                        text = if (appLang == AppLang.EN) {
-                            if (uiState.isFlypyChineseMode) "$schemeBadge Type" else "ABC"
-                        } else {
-                            "$schemeBadge 打字"
-                        },
-                        color = contentColor,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1
-                    )
-                }
-
-                ModeSegmentItem(
-                    selected = uiState.tabMode == KeyboardTabMode.TRANSLATE && !uiState.isToolPanelOpen,
-                    width = 34.dp,
-                    onClick = { onSelectTabMode(KeyboardTabMode.TRANSLATE) }
-                ) { contentColor ->
-                    Text(
-                        text = "文A",
-                        color = contentColor,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1
-                    )
-                }
+                TopBarHideKeyboardButton(onClick = onHideKeyboard)
             }
         }
         }
@@ -1057,6 +1032,52 @@ fun TopBarUndoIconButton(
             contentDescription = "撤销",
             tint = palette.keyTextPrimary,
             modifier = Modifier.size(17.dp)
+        )
+    }
+}
+
+@Composable
+fun TopBarImeSwitchButton(
+    onClick: () -> Unit
+) {
+    val palette = LocalTypeFreeKeyboardPalette.current
+    Box(
+        modifier = Modifier
+            .requiredSize(34.dp)
+            .clip(CircleShape)
+            .background(palette.keyCapBg)
+            .border(1.dp, palette.keyBorder, CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = TypeFreeIcons.Globe,
+            contentDescription = tr("切换输入法", "Switch Keyboard", "切換輸入法"),
+            tint = palette.keyTextPrimary,
+            modifier = Modifier.size(18.dp)
+        )
+    }
+}
+
+@Composable
+fun TopBarHideKeyboardButton(
+    onClick: () -> Unit
+) {
+    val palette = LocalTypeFreeKeyboardPalette.current
+    Box(
+        modifier = Modifier
+            .requiredSize(34.dp)
+            .clip(CircleShape)
+            .background(palette.keyCapBg)
+            .border(1.dp, palette.keyBorder, CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = TypeFreeIcons.KeyboardHide,
+            contentDescription = tr("收起键盘", "Hide Keyboard", "收起鍵盤"),
+            tint = palette.keyTextPrimary,
+            modifier = Modifier.size(18.dp)
         )
     }
 }

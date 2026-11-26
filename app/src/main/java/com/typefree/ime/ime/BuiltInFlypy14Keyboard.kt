@@ -1199,7 +1199,7 @@ private fun Flypy14SpaceBarKey(
                         var prevX = startPos.x
 
                         val longPressJob = outerScope.launch {
-                            delay(360L)
+                            delay(240L)
                             if (!isSliding && !voiceTriggered) {
                                 voiceTriggered = true
                                 isVoiceHolding = true

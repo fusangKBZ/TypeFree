@@ -483,7 +483,7 @@ data class AppSettings(
     val flypyEnabled: Boolean = true,
     val flypyCommaPeriodQuickSelect: Boolean = true,
     val rememberLastKeyboardMode: Boolean = true,
-    val lastKeyboardTab: String = "VOICE",
+    val lastKeyboardTab: String = "QWERTY",
     val lastQwertyIsChinese: Boolean = true,
     val qwertyShowNumberRow: Boolean = false,
     val qwertyKeyPopupPreview: Boolean = true,

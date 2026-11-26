@@ -335,6 +335,7 @@ class TypingController(
                 flypyComposingCode = code,
                 preeditDisplay = preedit,
                 t9Syllables = engineState.t9Syllables,
+                lockedSyllables = engineState.lockedSyllables,
                 activeSyllable = engineState.activeSyllable,
                 flypyCandidates = cands,
                 hasMoreCandidates = engineState.hasMore,
@@ -818,6 +819,7 @@ class TypingController(
                 flypyComposingCode = "",
                 preeditDisplay = "",
                 t9Syllables = emptyList(),
+                lockedSyllables = emptyList(),
                 activeSyllable = "",
                 flypyCandidates = emptyList(),
                 hasMoreCandidates = false,
@@ -937,6 +939,15 @@ class TypingController(
         predictionCoordinator.onUserKeyPressed()
         host.performKeyFeedback(strong = false)
         val result = rime.lockT9Syllable(syllable)
+        handleEngineResult(result)
+    }
+
+    fun unlockFlypy14Syllable(index: Int) {
+        val rime = rimeInputEngine as? com.typefree.ime.ime.engine.RimeInputEngine ?: return
+        if (activeEngine !== rime) return
+        predictionCoordinator.onUserKeyPressed()
+        host.performKeyFeedback(strong = false)
+        val result = rime.unlockFlypy14SyllableAt(index)
         handleEngineResult(result)
     }
 

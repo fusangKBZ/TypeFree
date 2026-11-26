@@ -905,4 +905,34 @@ object TypeFreeIcons {
             }
         }.build()
     }
+
+    /** Crisp keyboard + downward chevron icon for the top-bar Hide Keyboard button. */
+    val KeyboardHide: ImageVector by lazy {
+        ImageVector.Builder("KeyboardHide", 24.dp, 24.dp, 24f, 24f).apply {
+            path(
+                stroke = SolidColor(Color.White),
+                strokeLineWidth = 1.9f,
+                strokeLineCap = StrokeCap.Round,
+                strokeLineJoin = StrokeJoin.Round
+            ) {
+                moveTo(3f, 4.5f)
+                lineTo(21f, 4.5f)
+                lineTo(21f, 14f)
+                lineTo(3f, 14f)
+                close()
+                moveTo(7f, 8f)
+                lineTo(7.2f, 8f)
+                moveTo(12f, 8f)
+                lineTo(12.2f, 8f)
+                moveTo(17f, 8f)
+                lineTo(17.2f, 8f)
+                moveTo(8.5f, 11.2f)
+                lineTo(15.5f, 11.2f)
+                // Downward hide chevron below keyboard body
+                moveTo(9f, 17f)
+                lineTo(12f, 20f)
+                lineTo(15f, 17f)
+            }
+        }.build()
+    }
 }

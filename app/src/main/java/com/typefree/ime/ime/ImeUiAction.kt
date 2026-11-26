@@ -106,6 +106,7 @@ sealed interface ImeUiAction {
     data object ToggleFlypyLanguageMode : ImeUiAction
     data class SelectFlypyCandidate(val index: Int) : ImeUiAction
     data class SelectT9Syllable(val syllable: String) : ImeUiAction
+    data class UnlockFlypy14Syllable(val index: Int) : ImeUiAction
     data object ClearFlypyComposing : ImeUiAction
     data object FlushFlypyComposing : ImeUiAction
     data object ToggleFlypyCandidateSheet : ImeUiAction

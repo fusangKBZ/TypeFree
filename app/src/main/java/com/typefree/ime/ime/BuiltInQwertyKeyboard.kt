@@ -1331,7 +1331,7 @@ private fun QwertySpaceBarKey(
 
                         val longJob: Job? = if (currentOnStartVoice != null) {
                             outerScope.launch {
-                                delay(360L)
+                                delay(240L)
                                 if (!cancelled && !slidingActive && !voiceTriggered) {
                                     voiceTriggered = true
                                     voiceHolding = true

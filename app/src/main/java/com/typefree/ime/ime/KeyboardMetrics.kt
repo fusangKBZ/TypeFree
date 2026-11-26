@@ -54,6 +54,8 @@ data class KeyboardMetrics(
         const val FIXED_CHROME_DP = 48 // 1.dp divider + 5.dp top pad + 40.dp top bar + 2.dp gap
         /** Transparent floating preedit capsule overhang above the 1.dp keyboard divider (`0px` host viewport loss via `contentTopInsets`). */
         const val FLOATING_PREEDIT_OVERHANG_DP = 28
+        /** Interactive top Pinyin disambiguation bar height for 14-key Xiaohe above the divider (`TOUCHABLE_INSETS_FRAME`). */
+        const val PINYIN_OVERHANG_DP = 36
 
         fun computeFloatingOverhangContentTopInset(
             baseContentTopInsets: Int,
