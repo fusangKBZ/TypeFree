@@ -254,7 +254,7 @@ fun TopBarToolPanelButton(
 
     Box(
         modifier = Modifier
-            .requiredSize(28.dp)
+            .requiredSize(34.dp)
             .clip(CircleShape)
             .background(bgColor)
             .border(1.dp, borderColor, CircleShape)
@@ -262,10 +262,10 @@ fun TopBarToolPanelButton(
         contentAlignment = Alignment.Center
     ) {
         Icon(
-            imageVector = TypeFreeIcons.LogoMark,
-            contentDescription = if (isOpen) "收起工具面板" else "展开工具面板",
+            imageVector = TypeFreeIcons.SettingsGear,
+            contentDescription = if (isOpen) "收起工具与设置" else "工具与设置",
             tint = iconTint,
-            modifier = Modifier.size(15.dp)
+            modifier = Modifier.size(19.dp)
         )
     }
 }
@@ -374,8 +374,12 @@ fun TypeFreeTopBar(
         } else {
             null
         }
-        val showClipboardBtn = qwertyPlan?.showClipboardIconButton ?: slotState.showClipboardButton
-        val allowInlineBanner = qwertyPlan?.showLeftInlineBanner ?: true
+        val showClipboardBtn = if (isQwertyRightCluster) {
+            slotState.showClipboardButton && !isClipboardBannerActive
+        } else {
+            qwertyPlan?.showClipboardIconButton ?: slotState.showClipboardButton
+        }
+        val allowInlineBanner = if (isQwertyRightCluster) true else (qwertyPlan?.showLeftInlineBanner ?: true)
 
         Row(
             modifier = Modifier
@@ -406,11 +410,11 @@ fun TypeFreeTopBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-        // Left Cluster: [⊞] + [↶] + [📋] + Smart Paste / Status / Style Badge (VOICE only)
+        // Left Cluster: [⚙] + [↶] + [📋] + Transient Banners / Style Badge (VOICE only)
         Row(
             modifier = Modifier.weight(1f),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             TopBarToolPanelButton(
                 isOpen = uiState.isToolPanelOpen,
@@ -422,7 +426,7 @@ fun TypeFreeTopBar(
                 TopBarUndoIconButton(onClick = onPerformUndo)
             }
 
-            // 2. Permanent 1-Tap 26.dp Clipboard Button ([📋]) with green badge dot on fresh clip
+            // 2. Permanent 1-Tap 34.dp Clipboard Button ([📋]) with green badge dot on fresh clip
             if (showClipboardBtn) {
                 TopBarClipboardIconButton(
                     isOpen = uiState.isClipboardOpen,
@@ -447,26 +451,26 @@ fun TypeFreeTopBar(
             if (uiState.isIncognitoMode) {
                 Row(
                     modifier = Modifier
-                        .height(24.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .height(30.dp)
+                        .clip(RoundedCornerShape(15.dp))
                         .background(TypeFreeEmerald.copy(alpha = 0.16f))
-                        .border(1.dp, TypeFreeEmerald.copy(alpha = 0.55f), RoundedCornerShape(12.dp))
+                        .border(1.dp, TypeFreeEmerald.copy(alpha = 0.55f), RoundedCornerShape(15.dp))
                         .clickable(onClick = onToggleManualIncognito)
-                        .padding(horizontal = 6.dp),
+                        .padding(horizontal = 9.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     val incTint = if (palette.isDark) Color(0xFF6EE7B7) else Color(0xFF047857)
                     Icon(
                         imageVector = TypeFreeIcons.IncognitoMask,
                         contentDescription = tr("无痕模式", "Incognito Mode", "無痕模式"),
                         tint = incTint,
-                        modifier = Modifier.size(11.dp)
+                        modifier = Modifier.size(13.dp)
                     )
                     Text(
                         text = tr("无痕", "Incog", "無痕"),
                         color = incTint,
-                        fontSize = 10.5.sp,
+                        fontSize = 11.5.sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1
                     )
@@ -482,15 +486,17 @@ fun TypeFreeTopBar(
                 Box(
                     modifier = Modifier
                         .weight(1f, fill = false)
-                        .clip(RoundedCornerShape(12.dp))
+                        .height(32.dp)
+                        .clip(RoundedCornerShape(16.dp))
                         .background(TypeFreeEmerald.copy(alpha = 0.16f))
-                        .border(1.dp, TypeFreeEmerald.copy(alpha = 0.55f), RoundedCornerShape(12.dp))
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                        .border(1.dp, TypeFreeEmerald.copy(alpha = 0.55f), RoundedCornerShape(16.dp))
+                        .padding(horizontal = 10.dp),
+                    contentAlignment = Alignment.CenterStart
                 ) {
                     Text(
                         text = statusLabel,
                         color = if (palette.isDark) Color(0xFF6EE7B7) else Color(0xFF047857),
-                        fontSize = 10.5.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -500,10 +506,12 @@ fun TypeFreeTopBar(
                 Box(
                     modifier = Modifier
                         .weight(1f, fill = false)
-                        .clip(RoundedCornerShape(12.dp))
+                        .height(32.dp)
+                        .clip(RoundedCornerShape(16.dp))
                         .background(TypeFreeEmerald.copy(alpha = 0.15f))
-                        .border(1.dp, TypeFreeEmerald.copy(alpha = 0.45f), RoundedCornerShape(12.dp))
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                        .border(1.dp, TypeFreeEmerald.copy(alpha = 0.45f), RoundedCornerShape(16.dp))
+                        .padding(horizontal = 10.dp),
+                    contentAlignment = Alignment.CenterStart
                 ) {
                     Text(
                         text = tr(
@@ -512,7 +520,7 @@ fun TypeFreeTopBar(
                             "✓ 已自動收入詞典「$learnedTerm」"
                         ),
                         color = if (palette.isDark) Color(0xFF6EE7B7) else Color(0xFF047857),
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -522,15 +530,17 @@ fun TypeFreeTopBar(
                 Box(
                     modifier = Modifier
                         .weight(1f, fill = false)
-                        .clip(RoundedCornerShape(12.dp))
+                        .height(32.dp)
+                        .clip(RoundedCornerShape(16.dp))
                         .background(palette.capsuleSelectedBg)
-                        .border(1.dp, palette.keyBorder, RoundedCornerShape(12.dp))
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                        .border(1.dp, palette.keyBorder, RoundedCornerShape(16.dp))
+                        .padding(horizontal = 10.dp),
+                    contentAlignment = Alignment.CenterStart
                 ) {
                     Text(
                         text = quickToast,
                         color = palette.keyTextPrimary,
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -551,30 +561,30 @@ fun TypeFreeTopBar(
                     Row(
                         modifier = Modifier.weight(1f, fill = false),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Row(
                             modifier = Modifier
                                 .weight(1f, fill = false)
-                                .height(26.dp)
-                                .clip(RoundedCornerShape(13.dp))
+                                .height(32.dp)
+                                .clip(RoundedCornerShape(16.dp))
                                 .background(TypeFreeEmerald.copy(alpha = 0.15f))
-                                .border(1.dp, TypeFreeEmerald.copy(alpha = 0.48f), RoundedCornerShape(13.dp))
+                                .border(1.dp, TypeFreeEmerald.copy(alpha = 0.48f), RoundedCornerShape(16.dp))
                                 .clickable { onPasteClipboardText(smart.extractedValue) }
-                                .padding(horizontal = 8.dp),
+                                .padding(horizontal = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
                         ) {
                             Icon(
                                 imageVector = smartIcon,
                                 contentDescription = null,
                                 tint = clipTint,
-                                modifier = Modifier.size(11.dp)
+                                modifier = Modifier.size(13.dp)
                             )
                             Text(
                                 text = smart.extractedValue,
                                 color = clipTint,
-                                fontSize = 10.5.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -582,32 +592,32 @@ fun TypeFreeTopBar(
                         }
                         Row(
                             modifier = Modifier
-                                .height(26.dp)
-                                .clip(RoundedCornerShape(13.dp))
+                                .height(32.dp)
+                                .clip(RoundedCornerShape(16.dp))
                                 .background(palette.keyCapBg)
-                                .border(1.dp, palette.keyBorder, RoundedCornerShape(13.dp))
+                                .border(1.dp, palette.keyBorder, RoundedCornerShape(16.dp))
                                 .clickable { onPasteClipboardText(freshClip.text) }
-                                .padding(horizontal = 6.dp),
+                                .padding(horizontal = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                            horizontalArrangement = Arrangement.spacedBy(3.dp)
                         ) {
                             Icon(
                                 imageVector = TypeFreeIcons.Clipboard,
                                 contentDescription = null,
                                 tint = palette.keyTextPrimary,
-                                modifier = Modifier.size(10.5.dp)
+                                modifier = Modifier.size(12.dp)
                             )
                             Text(
                                 text = tr("全文", "Full", "全文"),
                                 color = palette.keyTextPrimary,
-                                fontSize = 10.5.sp,
+                                fontSize = 11.5.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 maxLines = 1
                             )
                         }
                         Box(
                             modifier = Modifier
-                                .requiredSize(22.dp)
+                                .requiredSize(28.dp)
                                 .clip(CircleShape)
                                 .background(palette.keyCapBg)
                                 .border(1.dp, palette.keyBorder, CircleShape)
@@ -618,39 +628,39 @@ fun TypeFreeTopBar(
                                 imageVector = TypeFreeIcons.Close,
                                 contentDescription = "关闭粘贴提示",
                                 tint = palette.keyTextMuted,
-                                modifier = Modifier.size(10.dp)
+                                modifier = Modifier.size(12.dp)
                             )
                         }
                     }
                 } else {
-                    val previewText = ClipboardSmartExtractor.formatSingleLinePreview(freshClip.text, 10)
+                    val previewText = ClipboardSmartExtractor.formatSingleLinePreview(freshClip.text, 14)
                     Row(
                         modifier = Modifier.weight(1f, fill = false),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Row(
                             modifier = Modifier
                                 .weight(1f, fill = false)
-                                .height(26.dp)
-                                .clip(RoundedCornerShape(13.dp))
+                                .height(32.dp)
+                                .clip(RoundedCornerShape(16.dp))
                                 .background(TypeFreeEmerald.copy(alpha = 0.15f))
-                                .border(1.dp, TypeFreeEmerald.copy(alpha = 0.48f), RoundedCornerShape(13.dp))
+                                .border(1.dp, TypeFreeEmerald.copy(alpha = 0.48f), RoundedCornerShape(16.dp))
                                 .clickable { onPasteClipboardText(freshClip.text) }
-                                .padding(horizontal = 8.dp),
+                                .padding(horizontal = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
                         ) {
                             Icon(
                                 imageVector = TypeFreeIcons.Clipboard,
                                 contentDescription = null,
                                 tint = clipTint,
-                                modifier = Modifier.size(11.dp)
+                                modifier = Modifier.size(13.dp)
                             )
                             Text(
                                 text = tr("粘贴「$previewText」", "Paste \"$previewText\"", "貼上「$previewText」"),
                                 color = clipTint,
-                                fontSize = 10.5.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -658,7 +668,7 @@ fun TypeFreeTopBar(
                         }
                         Box(
                             modifier = Modifier
-                                .requiredSize(22.dp)
+                                .requiredSize(28.dp)
                                 .clip(CircleShape)
                                 .background(palette.keyCapBg)
                                 .border(1.dp, palette.keyBorder, CircleShape)
@@ -669,7 +679,7 @@ fun TypeFreeTopBar(
                                 imageVector = TypeFreeIcons.Close,
                                 contentDescription = "关闭粘贴提示",
                                 tint = palette.keyTextMuted,
-                                modifier = Modifier.size(10.dp)
+                                modifier = Modifier.size(12.dp)
                             )
                         }
                     }
@@ -716,41 +726,15 @@ fun TypeFreeTopBar(
         Spacer(modifier = Modifier.width(4.dp))
 
         // Right Cluster:
-        // - In QWERTY mode: [✦ 军师] + [✍️ 帮写/改写] + Dark Primary [🎤 语音] (tap <220ms switches to VOICE; hold >=220ms dictates in-place)
-        //   When a transient banner (clipboard paste / toast / voice listening) takes over the middle, secondary AI pills yield cleanly.
-        // - In VOICE / TRANSLATE mode: Compact 2-Segment Track [鹤 打字 | 文A]
-        if (isQwertyRightCluster && qwertyPlan != null) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(5.dp)
-            ) {
-                if (qwertyPlan.showRightAskAi) {
-                    TopBarAskAiPill(onClick = onOpenAskAiCard)
-                }
-                if (qwertyPlan.showRightJevCopilot) {
-                    TopBarJevCopilotPill(onClick = onOpenJevCopilot)
-                }
-                if (qwertyPlan.showRightVoicePen) {
-                    TopBarVoicePenPill(
-                        label = slotState.voicePenLabel,
-                        isHighlighted = uiState.shouldShowTopBarSpeakToEditPill,
-                        onClick = onOpenHelpMeWrite
-                    )
-                }
-                QwertyTopBarHoldVoiceCapsule(
-                    isRecordingInPlace = uiState.voicePhase is VoicePhase.Recording,
-                    onTapSwitchToVoice = { onSelectTabMode(KeyboardTabMode.VOICE) },
-                    onStartVoiceDictation = onStartVoiceDictation,
-                    onStopVoiceDictation = onStopVoiceDictation
-                )
-            }
-        } else {
+        // - In QWERTY idle mode: clean top bar — no extra voice button or AI feature pills (Hold Spacebar for voice!).
+        // - In VOICE / TRANSLATE / ToolPanel mode: Compact 2-Segment Track [鹤 打字 | 文A]
+        if (!isQwertyRightCluster) {
             Row(
                 modifier = Modifier
-                    .height(30.dp)
-                    .clip(RoundedCornerShape(15.dp))
+                    .height(34.dp)
+                    .clip(RoundedCornerShape(17.dp))
                     .background(palette.capsuleTrackBg)
-                    .border(1.dp, palette.keyBorder, RoundedCornerShape(15.dp))
+                    .border(1.dp, palette.keyBorder, RoundedCornerShape(17.dp))
                     .padding(2.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(2.dp)
@@ -1022,12 +1006,12 @@ fun TopBarClipboardIconButton(
     val iconTint = if (isOpen) palette.onPrimaryMic else palette.keyTextPrimary
 
     Box(
-        modifier = Modifier.requiredSize(26.dp),
+        modifier = Modifier.requiredSize(34.dp),
         contentAlignment = Alignment.Center
     ) {
         Box(
             modifier = Modifier
-                .requiredSize(26.dp)
+                .requiredSize(34.dp)
                 .clip(CircleShape)
                 .background(bgColor)
                 .border(1.dp, borderColor, CircleShape)
@@ -1038,15 +1022,15 @@ fun TopBarClipboardIconButton(
                 imageVector = TypeFreeIcons.Clipboard,
                 contentDescription = "剪贴板",
                 tint = iconTint,
-                modifier = Modifier.size(13.dp)
+                modifier = Modifier.size(17.dp)
             )
         }
         if (hasFreshClip && !isOpen) {
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .offset(x = 1.dp, y = (-1).dp)
-                    .requiredSize(6.dp)
+                    .offset(x = 0.dp, y = 0.dp)
+                    .requiredSize(7.dp)
                     .clip(CircleShape)
                     .background(TypeFreeEmerald)
             )
@@ -1061,7 +1045,7 @@ fun TopBarUndoIconButton(
     val palette = LocalTypeFreeKeyboardPalette.current
     Box(
         modifier = Modifier
-            .requiredSize(26.dp)
+            .requiredSize(34.dp)
             .clip(CircleShape)
             .background(palette.keyCapBg)
             .border(1.dp, palette.keyBorder, CircleShape)
@@ -1072,7 +1056,7 @@ fun TopBarUndoIconButton(
             imageVector = TypeFreeIcons.Undo,
             contentDescription = "撤销",
             tint = palette.keyTextPrimary,
-            modifier = Modifier.size(13.dp)
+            modifier = Modifier.size(17.dp)
         )
     }
 }

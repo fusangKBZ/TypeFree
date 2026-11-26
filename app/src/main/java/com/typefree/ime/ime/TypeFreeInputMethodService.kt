@@ -656,11 +656,14 @@ class TypeFreeInputMethodService : ComposeInputMethodService(), ImeHostCallbacks
         val configuration = LocalConfiguration.current
         val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
+        val effectiveShowNumberRow = settings.qwertyShowNumberRow &&
+            uiState.activeInputScheme != InputScheme.RIME_DOUBLE_PINYIN_FLYPY_14 &&
+            uiState.activeInputScheme != InputScheme.RIME_T9_PINYIN
         val keyboardMetrics = remember(
             uiState.activeHeightLevel,
             uiState.activeHeightMode,
             uiState.activeLiftLevel,
-            settings.qwertyShowNumberRow,
+            effectiveShowNumberRow,
             isLandscape
         ) {
             KeyboardMetrics.fromLevel(
@@ -668,7 +671,7 @@ class TypeFreeInputMethodService : ComposeInputMethodService(), ImeHostCallbacks
                 isLandscape = isLandscape,
                 heightMode = uiState.activeHeightMode,
                 liftLevel = uiState.activeLiftLevel,
-                showNumberRow = settings.qwertyShowNumberRow
+                showNumberRow = effectiveShowNumberRow
             )
         }
 

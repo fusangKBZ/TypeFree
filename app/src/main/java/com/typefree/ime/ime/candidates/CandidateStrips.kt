@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -85,9 +87,9 @@ fun PredictionCandidateBar(
             .fillMaxWidth()
             .height(metrics.topBarHeight),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(5.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // 1. Stationary 28.dp Expand Button (identical position to TypeFreeTopBar)
+        // 1. Stationary 34.dp Settings Gear Button (identical position to TypeFreeTopBar)
         TopBarToolPanelButton(
             isOpen = isToolPanelOpen,
             onClick = onToggleToolPanel
@@ -100,25 +102,25 @@ fun PredictionCandidateBar(
                 .fillMaxHeight()
                 .horizontalScroll(scrollState),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             val cleanMath = passiveMathResult?.trim().orEmpty()
             if (cleanMath.isNotEmpty()) {
                 val mathDisplay = if (cleanMath.startsWith("=")) cleanMath else "= $cleanMath"
                 Box(
                     modifier = Modifier
-                        .height(28.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .height(34.dp)
+                        .clip(RoundedCornerShape(9.dp))
                         .background(TypeFreeEmerald.copy(alpha = if (palette.isDark) 0.16f else 0.12f))
-                        .border(1.dp, TypeFreeEmerald.copy(alpha = 0.72f), RoundedCornerShape(8.dp))
+                        .border(1.dp, TypeFreeEmerald.copy(alpha = 0.72f), RoundedCornerShape(9.dp))
                         .clickable { onSelectPassiveMath?.invoke(cleanMath) }
-                        .padding(horizontal = 9.dp),
+                        .padding(horizontal = 10.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = mathDisplay,
                         color = emeraldAccentText,
-                        fontSize = 13.5.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace,
                         maxLines = 1
@@ -138,18 +140,18 @@ fun PredictionCandidateBar(
                 }
                 Row(
                     modifier = Modifier
-                        .height(28.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .height(34.dp)
+                        .clip(RoundedCornerShape(9.dp))
                         .background(palette.capsuleSelectedBg)
-                        .border(1.dp, TypeFreeEmerald.copy(alpha = 0.72f), RoundedCornerShape(8.dp))
-                        .padding(start = 8.dp, end = if (onDismissPhraseSuggestion != null) 4.dp else 8.dp),
+                        .border(1.dp, TypeFreeEmerald.copy(alpha = 0.72f), RoundedCornerShape(9.dp))
+                        .padding(start = 10.dp, end = if (onDismissPhraseSuggestion != null) 4.dp else 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Text(
                         text = displayPhrase,
                         color = emeraldAccentText,
-                        fontSize = 12.5.sp,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         modifier = Modifier.clickable { onAcceptPhraseSuggestion?.invoke() }
@@ -157,8 +159,8 @@ fun PredictionCandidateBar(
                     if (onDismissPhraseSuggestion != null) {
                         Box(
                             modifier = Modifier
-                                .size(26.dp)
-                                .clip(RoundedCornerShape(6.dp))
+                                .size(28.dp)
+                                .clip(RoundedCornerShape(7.dp))
                                 .background(palette.keyCapSecondaryBg.copy(alpha = 0.72f))
                                 .clickable(onClick = onDismissPhraseSuggestion),
                             contentAlignment = Alignment.Center
@@ -166,7 +168,7 @@ fun PredictionCandidateBar(
                             Text(
                                 text = "×",
                                 color = palette.keyTextPrimary,
-                                fontSize = 13.sp,
+                                fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -178,18 +180,18 @@ fun PredictionCandidateBar(
                 if (word.isNotBlank()) {
                     Box(
                         modifier = Modifier
-                            .height(28.dp)
-                            .clip(RoundedCornerShape(8.dp))
+                            .height(34.dp)
+                            .clip(RoundedCornerShape(9.dp))
                             .background(palette.keyCapBg)
-                            .border(1.dp, palette.keyBorder, RoundedCornerShape(8.dp))
+                            .border(1.dp, palette.keyBorder, RoundedCornerShape(9.dp))
                             .clickable { onSelectEnglishSuggestion?.invoke(word) }
-                            .padding(horizontal = 9.dp),
+                            .padding(horizontal = 11.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = word,
                             color = palette.keyTextPrimary,
-                            fontSize = 13.5.sp,
+                            fontSize = 14.5.sp,
                             fontWeight = FontWeight.Medium,
                             maxLines = 1
                         )
@@ -198,6 +200,7 @@ fun PredictionCandidateBar(
             }
 
             predictions.forEachIndexed { idx, cand ->
+                val isFirstPrediction = idx == 0
                 val visualText = if (cand.text.length > 16 || cand.text.contains('\n')) {
                     cand.text.replace('\n', '↵').take(16) + "…"
                 } else {
@@ -205,19 +208,23 @@ fun PredictionCandidateBar(
                 }
                 Box(
                     modifier = Modifier
-                        .height(28.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(palette.keyCapBg)
-                        .border(1.dp, palette.keyBorder, RoundedCornerShape(8.dp))
+                        .height(34.dp)
+                        .clip(RoundedCornerShape(9.dp))
+                        .background(if (isFirstPrediction) palette.capsuleSelectedBg else palette.keyCapBg)
+                        .border(
+                            width = 1.dp,
+                            color = if (isFirstPrediction) TypeFreeEmerald.copy(alpha = 0.45f) else palette.keyBorder,
+                            shape = RoundedCornerShape(9.dp)
+                        )
                         .clickable { onSelectPrediction(idx) }
-                        .padding(horizontal = 8.dp),
+                        .padding(horizontal = 11.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = visualText,
                         color = palette.keyTextPrimary,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
+                        fontSize = 15.sp,
+                        fontWeight = if (isFirstPrediction) FontWeight.Bold else FontWeight.Medium,
                         maxLines = 1
                     )
                 }
@@ -235,18 +242,18 @@ fun PredictionCandidateBar(
             }
             Box(
                 modifier = Modifier
-                    .height(28.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                    .height(34.dp)
+                    .clip(RoundedCornerShape(9.dp))
                     .background(TypeFreeEmerald.copy(alpha = if (palette.isDark) 0.16f else 0.12f))
-                    .border(1.dp, TypeFreeEmerald.copy(alpha = 0.72f), RoundedCornerShape(8.dp))
+                    .border(1.dp, TypeFreeEmerald.copy(alpha = 0.72f), RoundedCornerShape(9.dp))
                     .clickable { onSelectAiCompletion(cleanAiText) }
-                    .padding(horizontal = 8.dp),
+                    .padding(horizontal = 10.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = "✦ $truncatedAi",
                     color = if (palette.isDark) Color(0xFF6EE7B7) else Color(0xFF047857),
-                    fontSize = 13.sp,
+                    fontSize = 13.5.sp,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1
                 )
@@ -256,18 +263,18 @@ fun PredictionCandidateBar(
         // 4. Dismiss Predictions (`×`)
         Box(
             modifier = Modifier
-                .size(28.dp)
-                .clip(RoundedCornerShape(8.dp))
+                .size(34.dp)
+                .clip(RoundedCornerShape(9.dp))
                 .background(palette.keyCapSecondaryBg)
-                .border(1.dp, palette.keyBorder, RoundedCornerShape(8.dp))
-                .clickable(onClick = onDismiss),
+                .border(1.dp, palette.keyBorder, RoundedCornerShape(9.dp))
+            .clickable(onClick = onDismiss),
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = "×",
-                color = palette.keyTextMuted,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold
+            Icon(
+                imageVector = TypeFreeIcons.Close,
+                contentDescription = "关闭联想词",
+                tint = palette.keyTextMuted,
+                modifier = Modifier.size(16.dp)
             )
         }
     }
@@ -361,21 +368,20 @@ fun CandidateStrip(
     orqDateOffsetDays: Int = 0,
     onStepOrqDate: ((Int) -> Unit)? = null,
     syllableFilterOptions: List<String> = emptyList(),
+    activeSyllable: String = "",
     onSelectSyllable: (String) -> Unit = {}
 ) {
     val palette = LocalTypeFreeKeyboardPalette.current
     val metrics = LocalKeyboardMetrics.current
     val scrollState = rememberScrollState()
-    var showSyllablePicker by remember { mutableStateOf(false) }
+    val sylScrollState = rememberScrollState()
 
-    LaunchedEffect(composingCode) {
+    LaunchedEffect(composingCode, preeditDisplay, candidates.firstOrNull()?.text, activeSyllable) {
         scrollState.scrollTo(0)
     }
 
-    LaunchedEffect(composingCode, syllableFilterOptions) {
-        if (syllableFilterOptions.size <= 1) {
-            showSyllablePicker = false
-        }
+    LaunchedEffect(syllableFilterOptions) {
+        sylScrollState.scrollTo(0)
     }
 
     LaunchedEffect(scrollState.value, scrollState.maxValue, hasMoreCandidates) {
@@ -389,42 +395,41 @@ fun CandidateStrip(
             .fillMaxWidth()
             .height(metrics.topBarHeight),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        if (showSyllablePicker && syllableFilterOptions.size > 1) {
+        // Left Pinyin filter zone + vertical divider (iFlytek style: left pinyin, right word candidates)
+        if (syllableFilterOptions.size > 1) {
             Row(
                 modifier = Modifier
-                    .weight(1f)
+                    .widthIn(max = 128.dp)
                     .fillMaxHeight()
-                    .horizontalScroll(rememberScrollState()),
+                    .horizontalScroll(sylScrollState),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(5.dp)
             ) {
                 syllableFilterOptions.forEachIndexed { idx, syl ->
+                    val isSelected = if (activeSyllable.isNotEmpty()) syl == activeSyllable else idx == 0
                     Box(
                         modifier = Modifier
-                            .height(28.dp)
+                            .height(32.dp)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(if (idx == 0) palette.capsuleSelectedBg else palette.keyCapBg)
+                            .background(if (isSelected) palette.capsuleSelectedBg else palette.keyCapBg)
                             .border(
                                 width = 1.dp,
-                                color = if (idx == 0) TypeFreeEmerald.copy(alpha = 0.72f) else palette.keyBorder,
+                                color = if (isSelected) TypeFreeEmerald.copy(alpha = 0.78f) else palette.keyBorder,
                                 shape = RoundedCornerShape(8.dp)
                             )
-                            .clickable {
-                                showSyllablePicker = false
-                                onSelectSyllable(syl)
-                            }
-                            .padding(horizontal = 10.dp),
+                            .clickable { onSelectSyllable(syl) }
+                            .padding(horizontal = 9.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = syl,
                             style = TextStyle(
-                                color = if (idx == 0) TypeFreeEmerald else palette.keyTextPrimary,
-                                fontSize = 13.sp,
-                                lineHeight = 15.sp,
-                                fontWeight = if (idx == 0) FontWeight.Bold else FontWeight.SemiBold,
+                                color = if (isSelected) TypeFreeEmerald else palette.keyTextPrimary,
+                                fontSize = 13.5.sp,
+                                lineHeight = 16.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
                                 platformStyle = PlatformTextStyle(includeFontPadding = false)
                             ),
                             maxLines = 1
@@ -432,7 +437,15 @@ fun CandidateStrip(
                     }
                 }
             }
-        } else if (candidates.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .width(1.dp)
+                    .height(22.dp)
+                    .background(palette.keyBorder)
+            )
+        }
+
+        if (candidates.isEmpty()) {
             val emptyHint = when {
                 composingCode.all { it == '`' } -> "反查：输双拼查形(如 ji`) 或 输双形查音(如 `bo)"
                 inputScheme.usesRime -> "无匹配候选 · 按回车上屏编码或空格清屏"
@@ -442,8 +455,8 @@ fun CandidateStrip(
                 text = emptyHint,
                 style = TextStyle(
                     color = if (composingCode.all { it == '`' }) palette.keyTextMuted else TypeFreeRose,
-                    fontSize = 12.sp,
-                    lineHeight = 15.sp,
+                    fontSize = 12.5.sp,
+                    lineHeight = 16.sp,
                     fontWeight = FontWeight.Medium,
                     platformStyle = PlatformTextStyle(includeFontPadding = false)
                 ),
@@ -451,6 +464,29 @@ fun CandidateStrip(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
+        } else if (syllableFilterOptions.size > 1) {
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .horizontalScroll(scrollState),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                candidates.take(40).forEachIndexed { idx, cand ->
+                    CandidateChipItem(
+                        index = idx,
+                        cand = cand,
+                        isFirst = idx == 0,
+                        codetableEnhancerActive = codetableEnhancerActive,
+                        isPinned = cand.text in pinnedWordsForCurrentCode,
+                        onClick = { onSelectCandidate(idx) },
+                        onPin = { onPinCandidate(cand.text) },
+                        onUnpin = { onUnpinCandidate(cand.text) },
+                        onBlock = { onBlockCandidate(cand.text) }
+                    )
+                }
+            }
         } else {
             // 1. Primary 1st candidate riveted at X = 12.dp (0px horizontal shift regardless of pinyin length)
             val firstCand = candidates.first()
@@ -473,7 +509,7 @@ fun CandidateStrip(
                     .fillMaxHeight()
                     .horizontalScroll(scrollState),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 candidates.drop(1).take(39).forEachIndexed { offsetIdx, cand ->
                     val actualIdx = offsetIdx + 1
@@ -501,25 +537,25 @@ fun CandidateStrip(
             }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 listOf(-1 to "-1天", 1 to "+1天").forEach { (delta, label) ->
                     Box(
                         modifier = Modifier
-                            .height(28.dp)
-                            .clip(RoundedCornerShape(8.dp))
+                            .height(34.dp)
+                            .clip(RoundedCornerShape(9.dp))
                             .background(palette.keyCapSecondaryBg)
-                            .border(1.dp, stepActiveBorder, RoundedCornerShape(8.dp))
+                            .border(1.dp, stepActiveBorder, RoundedCornerShape(9.dp))
                             .clickable { onStepOrqDate?.invoke(delta) }
-                            .padding(horizontal = 6.dp),
+                            .padding(horizontal = 8.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = label,
                             style = TextStyle(
                                 color = palette.keyTextPrimary,
-                                fontSize = 11.sp,
-                                lineHeight = 13.sp,
+                                fontSize = 12.sp,
+                                lineHeight = 14.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 platformStyle = PlatformTextStyle(includeFontPadding = false)
                             ),
@@ -530,80 +566,49 @@ fun CandidateStrip(
             }
         }
 
-        // 2.8 Optional inline Syllable Filter Toggle (`[音]`) for 14-key Xiaohe disambiguation
-        if (syllableFilterOptions.size > 1) {
+        // 3. Large Expand All Candidates Grid Button (`[⌄]`)
+        if (candidates.size > 2 || hasMoreCandidates || syllableFilterOptions.size > 1) {
             Box(
                 modifier = Modifier
-                    .height(28.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(if (showSyllablePicker) palette.capsuleSelectedBg else palette.keyCapSecondaryBg)
+                    .width(42.dp)
+                    .height(34.dp)
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(if (isSheetExpanded) palette.capsuleSelectedBg else palette.keyCapSecondaryBg)
                     .border(
                         width = 1.dp,
-                        color = if (showSyllablePicker) TypeFreeEmerald.copy(alpha = 0.72f) else palette.keyBorder,
-                        shape = RoundedCornerShape(8.dp)
+                        color = if (isSheetExpanded) TypeFreeEmerald.copy(alpha = 0.72f) else palette.keyBorder,
+                        shape = RoundedCornerShape(9.dp)
                     )
-                    .clickable { showSyllablePicker = !showSyllablePicker }
-                    .padding(horizontal = 7.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = if (showSyllablePicker) "词" else "音",
-                    style = TextStyle(
-                        color = if (showSyllablePicker) TypeFreeEmerald else palette.keyTextPrimary,
-                        fontSize = 11.5.sp,
-                        lineHeight = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        platformStyle = PlatformTextStyle(includeFontPadding = false)
-                    ),
-                    maxLines = 1
-                )
-            }
-        }
-
-        // 3. Expand All Candidates Grid Toggle (`[▾]`)
-        if (candidates.size > 4 || hasMoreCandidates) {
-            Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(if (isSheetExpanded) palette.capsuleSelectedBg else palette.keyCapSecondaryBg)
-                    .border(1.dp, palette.keyBorder, RoundedCornerShape(8.dp))
                     .clickable(onClick = onToggleSheet),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = if (isSheetExpanded) "▴" else "▾",
-                    style = TextStyle(
-                        color = palette.keyTextPrimary,
-                        fontSize = 12.sp,
-                        lineHeight = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        platformStyle = PlatformTextStyle(includeFontPadding = false)
-                    )
+                Icon(
+                    imageVector = TypeFreeIcons.ChevronDown,
+                    contentDescription = if (isSheetExpanded) "收起候选" else "展开更多候选",
+                    tint = palette.keyTextPrimary,
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }
 
-        // 4. 1-Tap Clear Code (`[×]`)
-        Box(
-            modifier = Modifier
-                .size(28.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(palette.keyCapSecondaryBg)
-                .border(1.dp, palette.keyBorder, RoundedCornerShape(8.dp))
-                .clickable(onClick = onClearCode),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "×",
-                style = TextStyle(
-                    color = palette.keyTextMuted,
-                    fontSize = 14.sp,
-                    lineHeight = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    platformStyle = PlatformTextStyle(includeFontPadding = false)
+        // 4. 1-Tap Clear Code (`[×]`) — omitted in 14-key mode where Row 4 right already provides [清除]
+        if (inputScheme != InputScheme.RIME_DOUBLE_PINYIN_FLYPY_14) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(palette.keyCapSecondaryBg)
+                    .border(1.dp, palette.keyBorder, RoundedCornerShape(9.dp))
+                    .clickable(onClick = onClearCode),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = TypeFreeIcons.Close,
+                    contentDescription = "清空编码",
+                    tint = palette.keyTextMuted,
+                    modifier = Modifier.size(16.dp)
                 )
-            )
+            }
         }
     }
 }
@@ -628,13 +633,13 @@ private fun CandidateChipItem(
     Box {
         Row(
             modifier = Modifier
-                .height(29.dp)
-                .clip(RoundedCornerShape(8.dp))
+                .height(34.dp)
+                .clip(RoundedCornerShape(9.dp))
                 .background(if (isFirst) palette.capsuleSelectedBg else palette.keyCapBg)
                 .border(
                     width = 1.dp,
                     color = if (isFirst) palette.keyTextPrimary.copy(alpha = 0.28f) else palette.keyBorder,
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(9.dp)
                 )
                 .combinedClickable(
                     onClick = onClick,
@@ -644,17 +649,17 @@ private fun CandidateChipItem(
                         null
                     }
                 )
-                .padding(horizontal = 9.dp),
+                .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(3.5.dp)
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             if (index < 3) {
                 Text(
                     text = "${index + 1}",
                     style = TextStyle(
                         color = palette.keyTextMuted,
-                        fontSize = 10.5.sp,
-                        lineHeight = 12.sp,
+                        fontSize = 11.sp,
+                        lineHeight = 13.sp,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.SemiBold,
                         platformStyle = PlatformTextStyle(includeFontPadding = false)
@@ -671,8 +676,8 @@ private fun CandidateChipItem(
                 text = visualCandText,
                 style = TextStyle(
                     color = palette.keyTextPrimary,
-                    fontSize = 14.5.sp,
-                    lineHeight = 17.sp,
+                    fontSize = 15.5.sp,
+                    lineHeight = 18.sp,
                     fontWeight = if (isFirst) FontWeight.Bold else FontWeight.Medium,
                     platformStyle = PlatformTextStyle(includeFontPadding = false)
                 ),
@@ -780,10 +785,17 @@ fun CandidateGridOverlay(
     onUnpinCandidate: (String) -> Unit = {},
     onBlockCandidate: (String) -> Unit = {},
     syllableFilterOptions: List<String> = emptyList(),
-    onSelectSyllable: (String) -> Unit = {}
+    activeSyllable: String = "",
+    onSelectSyllable: (String) -> Unit = {},
+    inputScheme: InputScheme = InputScheme.FLYPY_TABLE,
+    onClearCode: (() -> Unit)? = null
 ) {
     val palette = LocalTypeFreeKeyboardPalette.current
     val vScroll = rememberScrollState()
+
+    LaunchedEffect(candidates.firstOrNull()?.text, syllableFilterOptions, activeSyllable) {
+        vScroll.scrollTo(0)
+    }
 
     LaunchedEffect(hasMoreCandidates, vScroll.value, vScroll.maxValue) {
         if (hasMoreCandidates && (vScroll.maxValue == 0 || vScroll.value >= vScroll.maxValue - 80)) {
@@ -800,102 +812,123 @@ fun CandidateGridOverlay(
             .padding(6.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        if (syllableFilterOptions.size > 1) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                syllableFilterOptions.forEachIndexed { idx, syl ->
-                    Box(
-                        modifier = Modifier
-                            .height(26.dp)
-                            .clip(RoundedCornerShape(7.dp))
-                            .background(if (idx == 0) palette.capsuleSelectedBg else palette.keyCapSecondaryBg)
-                            .border(
-                                width = 1.dp,
-                                color = if (idx == 0) TypeFreeEmerald.copy(alpha = 0.72f) else palette.keyBorder,
-                                shape = RoundedCornerShape(7.dp)
-                            )
-                            .clickable { onSelectSyllable(syl) }
-                            .padding(horizontal = 9.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = syl,
-                            color = if (idx == 0) TypeFreeEmerald else palette.keyTextPrimary,
-                            fontSize = 12.sp,
-                            fontWeight = if (idx == 0) FontWeight.Bold else FontWeight.SemiBold,
-                            maxLines = 1
-                        )
-                    }
-                }
-            }
-        }
-        Box(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f)
-                .verticalScroll(vScroll)
+                .weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                candidates.forEachIndexed { idx, cand ->
-                    var gridMenuExpanded by remember(cand.text, idx) { mutableStateOf(false) }
-                    val longPressEnabled = codetableEnhancerActive && cand.text.isNotBlank() && !cand.text.startsWith("[")
-                    Box {
-                        Row(
+            // Left vertical Pinyin rail (classic iFlytek Shuangpin disambiguation layout)
+            if (syllableFilterOptions.size > 1) {
+                Column(
+                    modifier = Modifier
+                        .width(76.dp)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(palette.keyCapSecondaryBg.copy(alpha = 0.55f))
+                        .verticalScroll(rememberScrollState())
+                        .padding(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    syllableFilterOptions.forEachIndexed { idx, syl ->
+                        val isSelected = if (activeSyllable.isNotEmpty()) syl == activeSyllable else idx == 0
+                        Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(if (idx == 0) palette.capsuleSelectedBg else palette.keyCapBg)
-                                .border(1.dp, palette.keyBorder, RoundedCornerShape(8.dp))
-                                .combinedClickable(
-                                    onClick = { onSelectCandidate(idx) },
-                                    onLongClick = if (longPressEnabled) {
-                                        { gridMenuExpanded = true }
-                                    } else {
-                                        null
-                                    }
+                                .fillMaxWidth()
+                                .height(38.dp)
+                                .clip(RoundedCornerShape(7.dp))
+                                .background(if (isSelected) palette.capsuleSelectedBg else palette.keyCapBg)
+                                .border(
+                                    width = 1.dp,
+                                    color = if (isSelected) TypeFreeEmerald.copy(alpha = 0.78f) else palette.keyBorder,
+                                    shape = RoundedCornerShape(7.dp)
                                 )
-                                .padding(horizontal = 10.dp, vertical = 7.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                .clickable { onSelectSyllable(syl) },
+                            contentAlignment = Alignment.Center
                         ) {
-                            val rawGridDisplay = cand.displayText.ifEmpty { cand.text }
-                            val gridCandText = if (rawGridDisplay.length > 22 || rawGridDisplay.contains('\n')) {
-                                rawGridDisplay.replace('\n', '↵').take(22) + "…"
-                            } else {
-                                rawGridDisplay
-                            }
                             Text(
-                                text = gridCandText,
-                                color = palette.keyTextPrimary,
-                                fontSize = 15.sp,
-                                fontWeight = if (idx == 0) FontWeight.Bold else FontWeight.Medium
+                                text = syl,
+                                color = if (isSelected) TypeFreeEmerald else palette.keyTextPrimary,
+                                fontSize = 14.5.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                                maxLines = 1
                             )
-                            if (cand.codeHint.isNotEmpty()) {
-                                Text(
-                                    text = "〔${cand.codeHint}〕",
-                                    color = palette.keyTextMuted,
-                                    fontSize = 11.sp,
-                                    fontFamily = FontFamily.Monospace
-                                )
-                            }
                         }
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .fillMaxHeight()
+                        .background(palette.keyBorder)
+                )
+            }
 
-                        CandidateActionDropdownMenu(
-                            expanded = gridMenuExpanded,
-                            isPinned = cand.text in pinnedWordsForCurrentCode,
-                            onDismiss = { gridMenuExpanded = false },
-                            onPin = { onPinCandidate(cand.text) },
-                            onUnpin = { onUnpinCandidate(cand.text) },
-                            onBlock = { onBlockCandidate(cand.text) }
-                        )
+            // Right multi-row word/character candidate grid
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .verticalScroll(vScroll)
+            ) {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    candidates.forEachIndexed { idx, cand ->
+                        var gridMenuExpanded by remember(cand.text, idx) { mutableStateOf(false) }
+                        val longPressEnabled = codetableEnhancerActive && cand.text.isNotBlank() && !cand.text.startsWith("[")
+                        Box {
+                            Row(
+                                modifier = Modifier
+                                    .defaultMinSize(minHeight = 38.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (idx == 0) palette.capsuleSelectedBg else palette.keyCapBg)
+                                    .border(1.dp, palette.keyBorder, RoundedCornerShape(8.dp))
+                                    .combinedClickable(
+                                        onClick = { onSelectCandidate(idx) },
+                                        onLongClick = if (longPressEnabled) {
+                                            { gridMenuExpanded = true }
+                                        } else {
+                                            null
+                                        }
+                                    )
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                val rawGridDisplay = cand.displayText.ifEmpty { cand.text }
+                                val gridCandText = if (rawGridDisplay.length > 22 || rawGridDisplay.contains('\n')) {
+                                    rawGridDisplay.replace('\n', '↵').take(22) + "…"
+                                } else {
+                                    rawGridDisplay
+                                }
+                                Text(
+                                    text = gridCandText,
+                                    color = palette.keyTextPrimary,
+                                    fontSize = 16.sp,
+                                    fontWeight = if (idx == 0) FontWeight.Bold else FontWeight.Medium
+                                )
+                                if (cand.codeHint.isNotEmpty()) {
+                                    Text(
+                                        text = "〔${cand.codeHint}〕",
+                                        color = palette.keyTextMuted,
+                                        fontSize = 11.sp,
+                                        fontFamily = FontFamily.Monospace
+                                    )
+                                }
+                            }
+
+                            CandidateActionDropdownMenu(
+                                expanded = gridMenuExpanded,
+                                isPinned = cand.text in pinnedWordsForCurrentCode,
+                                onDismiss = { gridMenuExpanded = false },
+                                onPin = { onPinCandidate(cand.text) },
+                                onUnpin = { onUnpinCandidate(cand.text) },
+                                onBlock = { onBlockCandidate(cand.text) }
+                            )
+                        }
                     }
                 }
             }
@@ -904,7 +937,7 @@ fun CandidateGridOverlay(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(34.dp),
+                .height(38.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Box(
@@ -918,15 +951,15 @@ fun CandidateGridOverlay(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "▴ 返回键盘",
+                    text = "⌃ 返回键盘",
                     color = palette.keyTextPrimary,
-                    fontSize = 12.5.sp,
+                    fontSize = 13.5.sp,
                     fontWeight = FontWeight.SemiBold
                 )
             }
             Box(
                 modifier = Modifier
-                    .width(72.dp)
+                    .width(76.dp)
                     .fillMaxHeight()
                     .clip(RoundedCornerShape(8.dp))
                     .background(palette.keyCapSecondaryBg)
@@ -938,8 +971,30 @@ fun CandidateGridOverlay(
                     imageVector = TypeFreeIcons.Backspace,
                     contentDescription = "退格",
                     tint = palette.keyTextPrimary,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(19.dp)
                 )
+            }
+            if (onClearCode != null && inputScheme == InputScheme.RIME_DOUBLE_PINYIN_FLYPY_14) {
+                Box(
+                    modifier = Modifier
+                        .width(68.dp)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(palette.keyCapSecondaryBg)
+                        .border(1.dp, palette.keyBorder, RoundedCornerShape(8.dp))
+                        .clickable {
+                            onClearCode()
+                            onCollapse()
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "清除",
+                        color = palette.keyTextPrimary,
+                        fontSize = 13.5.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
             }
         }
     }

@@ -346,7 +346,7 @@ fun KeyboardScreen(
                                         isOrqDateActive = uiState.isOrqDateActive,
                                         orqDateOffsetDays = uiState.orqDateOffsetDays,
                                         onStepOrqDate = { delta -> onAction(ImeUiAction.StepOrqDate(delta)) },
-                                        syllableFilterOptions = if (uiState.activeInputScheme == InputScheme.RIME_DOUBLE_PINYIN_FLYPY_14) uiState.t9Syllables else emptyList(), onSelectSyllable = { onAction(ImeUiAction.SelectT9Syllable(it)) }
+                                        syllableFilterOptions = if (uiState.activeInputScheme == InputScheme.RIME_DOUBLE_PINYIN_FLYPY_14) uiState.t9Syllables else emptyList(), activeSyllable = uiState.activeSyllable, onSelectSyllable = { onAction(ImeUiAction.SelectT9Syllable(it)) }
                                     )
                                 }
 
@@ -494,11 +494,9 @@ fun KeyboardScreen(
                                         onSwipeUpBackspaceClear = { onAction(ImeUiAction.ClearInputBox) },
                                         onEditorShortcutAction = onEditorShortcutAction,
                                         onEnterOrNewline = onEnterOrNewline,
-                                        onSwitchToVoice = { onSelectTabMode(KeyboardTabMode.VOICE) },
-                                        onSwitchSystemIme = onSwitchKeyboard,
-                                        onHideKeyboard = onHideKeyboard,
-                                        onShowImePicker = onShowImePicker,
-                                        showNumberRow = settings.qwertyShowNumberRow,
+                                        onSwitchToVoice = { onSelectTabMode(KeyboardTabMode.VOICE) }, isVoiceRecording = uiState.voicePhase is VoicePhase.Recording, onStartVoiceDictation = { if (uiState.isFlypyComposing) onFlushFlypyComposing(); onMicPressDown(VoiceIntentMode.DICTATE) }, onStopVoiceDictation = onMicPressUp,
+                                        onSwitchSystemIme = onSwitchKeyboard, onHideKeyboard = onHideKeyboard, onShowImePicker = onShowImePicker,
+                                        showNumberRow = settings.qwertyShowNumberRow && uiState.activeInputScheme != InputScheme.RIME_DOUBLE_PINYIN_FLYPY_14 && uiState.activeInputScheme != InputScheme.RIME_T9_PINYIN,
                                         inputSessionToken = uiState.inputSessionToken,
                                         showKeyPopupPreview = settings.qwertyKeyPopupPreview,
                                         activeInputScheme = uiState.activeInputScheme,
@@ -532,7 +530,7 @@ fun KeyboardScreen(
                                                 onPinCandidate = { onAction(ImeUiAction.PinCandidate(it)) },
                                                 onUnpinCandidate = { onAction(ImeUiAction.UnpinCandidate(it)) },
                                                 onBlockCandidate = { onAction(ImeUiAction.BlockCandidate(it)) },
-                                                syllableFilterOptions = if (uiState.activeInputScheme == InputScheme.RIME_DOUBLE_PINYIN_FLYPY_14) uiState.t9Syllables else emptyList(), onSelectSyllable = { onAction(ImeUiAction.SelectT9Syllable(it)) }
+                                                syllableFilterOptions = if (uiState.activeInputScheme == InputScheme.RIME_DOUBLE_PINYIN_FLYPY_14) uiState.t9Syllables else emptyList(), activeSyllable = uiState.activeSyllable, onSelectSyllable = { onAction(ImeUiAction.SelectT9Syllable(it)) }, inputScheme = uiState.activeInputScheme, onClearCode = onClearFlypyComposing
                                             )
                                         }
                                     }

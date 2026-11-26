@@ -12,7 +12,7 @@ import kotlin.math.roundToInt
  * Unified keyboard height and scaling metrics for TypeFree v2.7.
  *
  * Rules:
- * - Only the key area scales; the 34.dp top bar and 1.dp top divider remain fixed across all levels.
+ * - Only the key area scales; the 40.dp top bar and 1.dp top divider remain fixed across all levels.
  * - All panels (VOICE, QWERTY, TRANSLATE, CLIPBOARD, TOOL_PANEL, HELP_ME_WRITE, SPEAK_TO_EDIT, ArcTranslate)
  *   read [frameHeight] from [LocalKeyboardMetrics] so switching panels causes 0px host relayout.
  * - Fixed-size elements on the Voice panel (mic orb, waveform) scale by [elementScale] = `min(scale, 1f)`
@@ -51,7 +51,7 @@ data class KeyboardMetrics(
 
         private const val BASE_KEY_AREA_4ROW_DP = 210f
         private const val BASE_KEY_AREA_5ROW_DP = 252f
-        const val FIXED_CHROME_DP = 42 // 1.dp divider + 5.dp top pad + 34.dp top bar + 2.dp gap
+        const val FIXED_CHROME_DP = 48 // 1.dp divider + 5.dp top pad + 40.dp top bar + 2.dp gap
         /** Transparent floating preedit capsule overhang above the 1.dp keyboard divider (`0px` host viewport loss via `contentTopInsets`). */
         const val FLOATING_PREEDIT_OVERHANG_DP = 28
 
@@ -127,7 +127,7 @@ data class KeyboardMetrics(
                 isLandscape = isLandscape,
                 scale = effectiveScale,
                 elementScale = min(effectiveScale, 1.0f),
-                topBarHeight = 34.dp,
+                topBarHeight = 40.dp,
                 dividerHeight = 1.dp,
                 keyAreaHeight = keyAreaDp.dp,
                 frameHeight = frameDp.dp,

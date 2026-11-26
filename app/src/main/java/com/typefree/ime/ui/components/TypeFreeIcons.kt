@@ -862,4 +862,47 @@ object TypeFreeIcons {
             }
         }.build()
     }
+
+    /** Crisp 6-tooth settings gear icon matching the uniform 2dp stroke family. */
+    val SettingsGear: ImageVector by lazy {
+        ImageVector.Builder("SettingsGear", 24.dp, 24.dp, 24f, 24f).apply {
+            path(
+                stroke = SolidColor(Color.White),
+                strokeLineWidth = 2.0f,
+                strokeLineCap = StrokeCap.Round,
+                strokeLineJoin = StrokeJoin.Round
+            ) {
+                moveTo(10.2f, 2.8f)
+                lineTo(13.8f, 2.8f)
+                lineTo(14.4f, 5.6f)
+                lineTo(16.3f, 6.7f)
+                lineTo(19.1f, 5.8f)
+                lineTo(20.9f, 8.9f)
+                lineTo(18.7f, 10.9f)
+                lineTo(18.7f, 13.1f)
+                lineTo(20.9f, 15.1f)
+                lineTo(19.1f, 18.2f)
+                lineTo(16.3f, 17.3f)
+                lineTo(14.4f, 18.4f)
+                lineTo(13.8f, 21.2f)
+                lineTo(10.2f, 21.2f)
+                lineTo(9.6f, 18.4f)
+                lineTo(7.7f, 17.3f)
+                lineTo(4.9f, 18.2f)
+                lineTo(3.1f, 15.1f)
+                lineTo(5.3f, 13.1f)
+                lineTo(5.3f, 10.9f)
+                lineTo(3.1f, 8.9f)
+                lineTo(4.9f, 5.8f)
+                lineTo(7.7f, 6.7f)
+                lineTo(9.6f, 5.6f)
+                close()
+                // Center ring
+                moveTo(15.2f, 12f)
+                arcTo(3.2f, 3.2f, 0f, isMoreThanHalf = true, isPositiveArc = true, 8.8f, 12f)
+                arcTo(3.2f, 3.2f, 0f, isMoreThanHalf = true, isPositiveArc = true, 15.2f, 12f)
+                close()
+            }
+        }.build()
+    }
 }

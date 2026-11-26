@@ -1,5 +1,6 @@
 package com.typefree.ime.ime
 
+import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -50,6 +51,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -69,6 +71,7 @@ import com.typefree.ime.i18n.LocalAppLanguage
 import com.typefree.ime.i18n.tr
 import com.typefree.ime.ui.components.TypeFreeIcons
 import com.typefree.ime.ui.theme.LocalTypeFreeKeyboardPalette
+import com.typefree.ime.ui.theme.TypeFreeEmerald
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -261,7 +264,7 @@ private const val KEY_LONG_PRESS_MS = ImeLogic.SECONDARY_KEY_LONG_PRESS_MS
 // to hold a golden keycap aspect ratio with generous vertical row separation.
 private val KEY_CELL_HPAD = 2.4.dp
 private val KEY_CELL_VPAD_5ROW = 3.2.dp
-private val KEY_CELL_VPAD_4ROW = 3.2.dp
+private val KEY_CELL_VPAD_4ROW = 2.4.dp
 private val NUM_ROW_VPAD = 2.8.dp
 private val ALPHA_KEY_CORNER = 6.5.dp
 private val NUM_KEY_CORNER = 6.0.dp
@@ -293,6 +296,9 @@ fun BuiltInQwertyKeyboard(
     onEditorShortcutAction: (EditorShortcutAction) -> Unit,
     onEnterOrNewline: () -> Unit,
     onSwitchToVoice: () -> Unit,
+    isVoiceRecording: Boolean = false,
+    onStartVoiceDictation: () -> Unit = {},
+    onStopVoiceDictation: () -> Unit = {},
     onSwitchSystemIme: () -> Unit,
     onHideKeyboard: () -> Unit = {},
     onShowImePicker: () -> Unit = {},
@@ -552,7 +558,7 @@ fun BuiltInQwertyKeyboard(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .weight(1f),
+                            .weight(if (hasFiveRows) 1f else 1.03f),
                         horizontalArrangement = Arrangement.spacedBy(0.dp)
                     ) {
                         QwertyShiftKey(
@@ -705,12 +711,14 @@ fun BuiltInQwertyKeyboard(
                 }
 
                 // Row 4:
-                // - 6-key default (total = 1.35 + 1.00 + 1.00 + 3.95 + 1.00 + 1.70 = 10.00f)
+                // - 6-key default ([中/英] unified on right before Enter):
+                //   total = 1.35 + 1.05 + 3.65 + 1.05 + 1.30 + 1.60 = 10.00f
                 // - 5-key codetable bottom row (total = 1.40 + 1.40 + 4.10 + 1.40 + 1.70 = 10.00f)
                 val w123 = if (fiveKeyBottomRow) 1.40f else 1.35f
-                val wComma = if (fiveKeyBottomRow) 1.40f else 1.00f
-                val wSpace = if (fiveKeyBottomRow) 4.10f else 3.95f
-                val wPeriod = if (fiveKeyBottomRow) 1.40f else 1.00f
+                val wComma = if (fiveKeyBottomRow) 1.40f else 1.05f
+                val wSpace = if (fiveKeyBottomRow) 4.10f else 3.65f
+                val wPeriod = if (fiveKeyBottomRow) 1.40f else 1.05f
+                val wEnter = if (fiveKeyBottomRow) 1.70f else 1.60f
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -731,54 +739,6 @@ fun BuiltInQwertyKeyboard(
                             isMoreSymbols = false
                         }
                     )
-
-                    if (!fiveKeyBottomRow) {
-                        // [中/英] Language Toggle Key: tap = toggle 中文 <-> EN, long-press = system IME picker
-                        val langInteraction = remember { MutableInteractionSource() }
-                        val langPressed by langInteraction.collectIsPressedAsState()
-                        val effectiveChinese = isFlypyChineseMode && !isSymbolLayer
-                        Box(
-                            modifier = Modifier
-                                .weight(1.00f)
-                                .fillMaxHeight()
-                                .combinedClickable(
-                                    interactionSource = langInteraction,
-                                    indication = null,
-                                    onClick = onToggleFlypyLanguageMode,
-                                    onLongClick = onSwitchSystemIme
-                                )
-                                .padding(horizontal = KEY_CELL_HPAD, vertical = rowVPad)
-                        ) {
-                            TactileKeycapSurface(
-                                isPressed = langPressed,
-                                cornerRadius = FUNC_KEY_CORNER,
-                                faceColor = if (langPressed) palette.keyBorder else palette.keyCapSecondaryBg,
-                                borderColor = palette.keyBorder.copy(alpha = 0.65f),
-                                shadowColor = palette.keyShadow
-                            ) {
-                                Text(
-                                    text = if (effectiveChinese) "中" else "EN",
-                                    color = palette.keyTextPrimary,
-                                    fontSize = 13.5.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    maxLines = 1,
-                                    modifier = Modifier
-                                        .align(Alignment.Center)
-                                        .offset(x = (-2).dp, y = (-1).dp)
-                                )
-                                Text(
-                                    text = if (effectiveChinese) "英" else "中",
-                                    color = palette.keyTextMuted.copy(alpha = 0.62f),
-                                    fontSize = 8.5.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1,
-                                    modifier = Modifier
-                                        .align(Alignment.BottomEnd)
-                                        .padding(bottom = 2.dp, end = 4.dp)
-                                )
-                            }
-                        }
-                    }
 
                     val showSecondBadge = hasActiveFlypyComposing && commaPeriodQuickSelect && flypyCandidateCount >= 2
                     val showThirdBadge = hasActiveFlypyComposing && commaPeriodQuickSelect && flypyCandidateCount >= 3
@@ -820,16 +780,18 @@ fun BuiltInQwertyKeyboard(
                         }
                     )
 
-                    // Wide Space Bar: Tap commits 1st candidate / space, Hold & Slide horizontally moves cursor,
-                    // Long-press (when not sliding) toggles 中文 <-> EN
+                    // Wide Space Bar: Tap commits 1st candidate / prediction / space,
+                    // Slide horizontally moves cursor, Hold (>=360ms) dictates in-place
                     QwertySpaceBarKey(
                         isFlypyChineseMode = isFlypyChineseMode && !isSymbolLayer,
                         activeInputScheme = activeInputScheme,
                         hasComposing = hasActiveFlypyComposing,
                         verticalCellPad = rowVPad,
+                        isVoiceRecording = isVoiceRecording,
                         onTap = onInsertSpace,
                         onMoveCursorByStep = onMoveCursorByStep,
-                        onLongPressToggleLanguage = onToggleFlypyLanguageMode,
+                        onStartVoiceDictation = onStartVoiceDictation,
+                        onStopVoiceDictation = onStopVoiceDictation,
                         modifier = Modifier
                             .weight(wSpace)
                             .fillMaxHeight()
@@ -871,6 +833,56 @@ fun BuiltInQwertyKeyboard(
                         }
                     )
 
+                    if (!fiveKeyBottomRow) {
+                        // [中/英] Language Toggle Key unified on the right side (matches 14-key CN layout):
+                        // tap = toggle 中文 <-> EN, long-press = system IME picker
+                        val langInteraction = remember { MutableInteractionSource() }
+                        val langPressed by langInteraction.collectIsPressedAsState()
+                        val effectiveChinese = isFlypyChineseMode && !isSymbolLayer
+                        Box(
+                            modifier = Modifier
+                                .weight(1.30f)
+                                .fillMaxHeight()
+                                .combinedClickable(
+                                    interactionSource = langInteraction,
+                                    indication = null,
+                                    onClick = onToggleFlypyLanguageMode,
+                                    onLongClick = onSwitchSystemIme
+                                )
+                                .padding(horizontal = KEY_CELL_HPAD, vertical = rowVPad)
+                        ) {
+                            TactileKeycapSurface(
+                                isPressed = langPressed,
+                                cornerRadius = FUNC_KEY_CORNER,
+                                faceColor = if (langPressed) palette.keyBorder else palette.keyCapSecondaryBg,
+                                borderColor = palette.keyBorder.copy(alpha = 0.65f),
+                                shadowColor = palette.keyShadow
+                            ) {
+                                Row(
+                                    modifier = Modifier.align(Alignment.Center),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = if (effectiveChinese) "中" else "EN",
+                                        color = palette.keyTextPrimary,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        maxLines = 1,
+                                        style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
+                                    )
+                                    Text(
+                                        text = if (effectiveChinese) "/英" else "/中",
+                                        color = palette.keyTextMuted.copy(alpha = 0.72f),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Normal,
+                                        maxLines = 1,
+                                        style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     // Adaptive Enter / Action Key (commits raw code when composing in Flypy!)
                     val isPrimaryAction = !hasActiveFlypyComposing && enterActionInfo.performEditorActionId != null
                     val enterInteraction = remember { MutableInteractionSource() }
@@ -885,7 +897,7 @@ fun BuiltInQwertyKeyboard(
 
                     Box(
                         modifier = Modifier
-                            .weight(1.70f)
+                            .weight(wEnter)
                             .fillMaxHeight()
                             .clickable(
                                 interactionSource = enterInteraction,
@@ -946,7 +958,7 @@ fun BuiltInQwertyKeyboard(
             Spacer(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(6.dp)
+                    .height(if (hasFiveRows) 6.dp else 5.dp)
             )
         }
 
@@ -1277,12 +1289,15 @@ private fun QwertySpaceBarKey(
     activeInputScheme: InputScheme = InputScheme.FLYPY_TABLE,
     hasComposing: Boolean,
     verticalCellPad: Dp = KEY_CELL_VPAD_5ROW,
+    isVoiceRecording: Boolean = false,
     onTap: () -> Unit,
     onMoveCursorByStep: (Int) -> Unit = {},
-    onLongPressToggleLanguage: (() -> Unit)? = null,
+    onStartVoiceDictation: (() -> Unit)? = null,
+    onStopVoiceDictation: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val palette = LocalTypeFreeKeyboardPalette.current
+    val view = LocalView.current
     val density = LocalDensity.current
     val touchSlopPx = with(density) { 28.dp.toPx() }
     val slideActivatePx = with(density) { ImeLogic.SPACE_CURSOR_SLIDE_ACTIVATE_DP.dp.toPx() }
@@ -1290,9 +1305,12 @@ private fun QwertySpaceBarKey(
 
     val currentOnTap by rememberUpdatedState(onTap)
     val currentOnMoveCursor by rememberUpdatedState(onMoveCursorByStep)
-    val currentOnLongPressToggleLanguage by rememberUpdatedState(onLongPressToggleLanguage)
+    val currentOnStartVoice by rememberUpdatedState(onStartVoiceDictation)
+    val currentOnStopVoice by rememberUpdatedState(onStopVoiceDictation)
     var isPressed by remember { mutableStateOf(false) }
     var isCursorSliding by remember { mutableStateOf(false) }
+    var voiceHolding by remember { mutableStateOf(false) }
+    val isVoiceActive = voiceHolding || isVoiceRecording
 
     Box(
         modifier = modifier
@@ -1306,17 +1324,19 @@ private fun QwertySpaceBarKey(
                         var lastX = startX
                         var accumulatedDx = 0f
                         var slidingActive = false
-                        var longPressed = false
+                        var voiceTriggered = false
                         var cancelled = false
                         isPressed = true
                         isCursorSliding = false
 
-                        val longJob: Job? = if (currentOnLongPressToggleLanguage != null) {
+                        val longJob: Job? = if (currentOnStartVoice != null) {
                             outerScope.launch {
-                                delay(420L)
-                                if (!cancelled && !slidingActive && !longPressed) {
-                                    longPressed = true
-                                    currentOnLongPressToggleLanguage?.invoke()
+                                delay(360L)
+                                if (!cancelled && !slidingActive && !voiceTriggered) {
+                                    voiceTriggered = true
+                                    voiceHolding = true
+                                    view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                                    currentOnStartVoice?.invoke()
                                 }
                             }
                         } else {
@@ -1337,7 +1357,7 @@ private fun QwertySpaceBarKey(
                                 val frameDx = pos.x - lastX
                                 lastX = pos.x
 
-                                if (!longPressed && !slidingActive && abs(totalDx) >= slideActivatePx) {
+                                if (!voiceTriggered && !slidingActive && abs(totalDx) >= slideActivatePx) {
                                     slidingActive = true
                                     isCursorSliding = true
                                     longJob?.cancel()
@@ -1357,7 +1377,7 @@ private fun QwertySpaceBarKey(
                                         currentOnMoveCursor(steps)
                                     }
                                 } else if (
-                                    !longPressed &&
+                                    !voiceTriggered &&
                                     (pos.y < -touchSlopPx ||
                                         pos.y > size.height + touchSlopPx)
                                 ) {
@@ -1372,12 +1392,17 @@ private fun QwertySpaceBarKey(
                                 }
                             }
                         } finally {
+                            longJob?.cancel()
+                            val shouldStopVoice = voiceTriggered
                             isPressed = false
                             isCursorSliding = false
-                            longJob?.cancel()
+                            voiceHolding = false
+                            if (shouldStopVoice) {
+                                currentOnStopVoice?.invoke()
+                            }
                         }
 
-                        if (!cancelled && !slidingActive && !longPressed) {
+                        if (!cancelled && !slidingActive && !voiceTriggered) {
                             currentOnTap()
                         }
                     }
@@ -1386,14 +1411,19 @@ private fun QwertySpaceBarKey(
             .padding(horizontal = KEY_CELL_HPAD, vertical = verticalCellPad)
     ) {
         TactileKeycapSurface(
-            isPressed = isPressed,
+            isPressed = isPressed && !isVoiceActive,
             cornerRadius = FUNC_KEY_CORNER,
-            faceColor = if (isPressed) palette.keyCapSecondaryBg else palette.keyCapBg,
-            borderColor = palette.keyBorder.copy(alpha = if (palette.isDark) 0.58f else 0.50f),
+            faceColor = when {
+                isVoiceActive -> palette.capsuleSelectedBg
+                isPressed -> palette.keyCapSecondaryBg
+                else -> palette.keyCapBg
+            },
+            borderColor = if (isVoiceActive) TypeFreeEmerald.copy(alpha = 0.72f) else palette.keyBorder.copy(alpha = if (palette.isDark) 0.58f else 0.50f),
             shadowColor = palette.keyShadow
         ) {
             val spaceLang = LocalAppLanguage.current
             val label = when {
+                isVoiceActive -> tr("🎙 聆听中 · 松手上屏", "🎙 Listening · Release", "🎙 聆聽中 · 放開上屏")
                 isCursorSliding -> tr("‹ 滑动移光标 ›", "‹ Slide to move cursor ›", "‹ 滑動移游標 ›")
                 hasComposing -> tr("空格首选", "Space: 1st", "空白首選")
                 isFlypyChineseMode -> if (spaceLang == AppLang.EN) {
@@ -1405,11 +1435,18 @@ private fun QwertySpaceBarKey(
             }
             Text(
                 text = label,
-                color = if (hasComposing || isCursorSliding) palette.keyTextPrimary else palette.keyTextMuted,
+                color = when {
+                    isVoiceActive -> if (palette.isDark) Color(0xFF6EE7B7) else Color(0xFF047857)
+                    hasComposing || isCursorSliding -> palette.keyTextPrimary
+                    else -> palette.keyTextMuted
+                },
                 fontSize = 12.sp,
-                fontWeight = if (hasComposing || isCursorSliding) FontWeight.SemiBold else FontWeight.Medium,
+                fontWeight = if (isVoiceActive || hasComposing || isCursorSliding) FontWeight.SemiBold else FontWeight.Medium,
                 maxLines = 1,
-                modifier = Modifier.align(Alignment.Center)
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(horizontal = 4.dp)
             )
         }
     }

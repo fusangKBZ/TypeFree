@@ -34,7 +34,7 @@ class LiftModeAndLiveWriteDedupTest {
 
     @Test
     fun `LIFT mode keeps standard keys and adds 0-8-16-24-32dp bottom cushion`() {
-        val expected4RowFrames = listOf(252, 260, 268, 276, 284)
+        val expected4RowFrames = listOf(258, 266, 274, 282, 290)
         KeyboardMetrics.ALL_LIFT_LEVELS.forEachIndexed { idx, liftLevel ->
             val m = KeyboardMetrics.fromLevel(
                 level = 0,
@@ -49,10 +49,10 @@ class LiftModeAndLiveWriteDedupTest {
             assertEquals(1.0f, m.elementScale, 0.0001f)
             assertEquals((liftLevel * 8).dp, m.liftHeight)
             assertEquals(expected4RowFrames[idx].dp, m.frameHeight)
-            assertEquals(34.dp, m.topBarHeight)
+            assertEquals(40.dp, m.topBarHeight)
         }
 
-        val expected5RowFrames = listOf(294, 302, 310, 318, 326)
+        val expected5RowFrames = listOf(300, 308, 316, 324, 332)
         KeyboardMetrics.ALL_LIFT_LEVELS.forEachIndexed { idx, liftLevel ->
             val m5 = KeyboardMetrics.fromLevel(
                 level = 0,
@@ -76,7 +76,7 @@ class LiftModeAndLiveWriteDedupTest {
             showNumberRow = false
         )
         assertEquals(210.dp, liftWithStretchLevel.keyAreaHeight)
-        assertEquals(268.dp, liftWithStretchLevel.frameHeight)
+        assertEquals(274.dp, liftWithStretchLevel.frameHeight)
 
         // Out-of-range lift levels are clamped
         val over = KeyboardMetrics.fromLevel(level = 0, heightMode = KeyboardHeightMode.LIFT, liftLevel = 99)
@@ -92,12 +92,12 @@ class LiftModeAndLiveWriteDedupTest {
             liftLevel = 4
         )
         assertEquals(0.dp, landscape.liftHeight)
-        assertEquals(190.dp, landscape.frameHeight)
+        assertEquals(196.dp, landscape.frameHeight)
 
         // STRETCH mode never has a cushion
         val stretch = KeyboardMetrics.fromLevel(level = 2, heightMode = KeyboardHeightMode.STRETCH, liftLevel = 4)
         assertEquals(0.dp, stretch.liftHeight)
-        assertEquals(281.dp, stretch.frameHeight)
+        assertEquals(287.dp, stretch.frameHeight)
     }
 
     @Test

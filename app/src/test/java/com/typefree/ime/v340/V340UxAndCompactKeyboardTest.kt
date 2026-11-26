@@ -35,7 +35,7 @@ class V340UxAndCompactKeyboardTest {
 
     @Test
     fun keyboardMetrics_4RowCompact252dpAnd5Row294dpWithLiftLevels_conserveHeightAcrossModes() {
-        val expected4Row = listOf(252, 260, 268, 276, 284)
+        val expected4Row = listOf(258, 266, 274, 282, 290)
         for ((idx, liftLevel) in KeyboardMetrics.ALL_LIFT_LEVELS.withIndex()) {
             val m4 = KeyboardMetrics.fromLevel(
                 level = 0,
@@ -46,13 +46,13 @@ class V340UxAndCompactKeyboardTest {
             )
             assertEquals(KeyboardHeightMode.LIFT, m4.heightMode)
             assertEquals(210.dp, m4.keyAreaHeight)
-            assertEquals(34.dp, m4.topBarHeight)
+            assertEquals(40.dp, m4.topBarHeight)
             assertEquals(1.dp, m4.dividerHeight)
             assertEquals((liftLevel * 8).dp, m4.liftHeight)
             assertEquals(expected4Row[idx].dp, m4.frameHeight)
         }
 
-        val expected5Row = listOf(294, 302, 310, 318, 326)
+        val expected5Row = listOf(300, 308, 316, 324, 332)
         for ((idx, liftLevel) in KeyboardMetrics.ALL_LIFT_LEVELS.withIndex()) {
             val m5 = KeyboardMetrics.fromLevel(
                 level = 0,
@@ -67,9 +67,9 @@ class V340UxAndCompactKeyboardTest {
             assertEquals(expected5Row[idx].dp, m5.frameHeight)
         }
 
-        // Default call uses 4-row LIFT 0dp = 252.dp
+        // Default call uses 4-row LIFT 0dp = 258.dp
         val defaultMetrics = KeyboardMetrics.fromLevel(level = 0)
-        assertEquals(252.dp, defaultMetrics.frameHeight)
+        assertEquals(258.dp, defaultMetrics.frameHeight)
         assertEquals(210.dp, defaultMetrics.keyAreaHeight)
         assertEquals(0.dp, defaultMetrics.liftHeight)
     }

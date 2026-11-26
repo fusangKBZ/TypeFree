@@ -335,6 +335,7 @@ class TypingController(
                 flypyComposingCode = code,
                 preeditDisplay = preedit,
                 t9Syllables = engineState.t9Syllables,
+                activeSyllable = engineState.activeSyllable,
                 flypyCandidates = cands,
                 hasMoreCandidates = engineState.hasMore,
                 isOrqDateActive = engineState.isOrqDateActive,
@@ -817,6 +818,7 @@ class TypingController(
                 flypyComposingCode = "",
                 preeditDisplay = "",
                 t9Syllables = emptyList(),
+                activeSyllable = "",
                 flypyCandidates = emptyList(),
                 hasMoreCandidates = false,
                 isOrqDateActive = false,
@@ -1055,6 +1057,18 @@ class TypingController(
                 ?: lastCommitDuringDispatch
             detectAndRecordSnippetHitIfMatched(prevCode, committed)
             handleEngineResult(result)
+            return
+        }
+        if (
+            curr.tabMode == KeyboardTabMode.QWERTY &&
+            curr.isFlypyChineseMode &&
+            !isComposing &&
+            !curr.isToolPanelOpen &&
+            !curr.isClipboardOpen &&
+            curr.isPredictionBarVisible &&
+            curr.predictionCandidates.isNotEmpty()
+        ) {
+            selectPredictionCandidate(0)
             return
         }
         predictionCoordinator.dismissPredictions(resetChain = true)

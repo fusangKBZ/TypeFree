@@ -1,5 +1,6 @@
 package com.typefree.ime.ime
 
+import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -51,6 +52,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -62,6 +64,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import com.typefree.ime.data.VoiceIntentMode
 import com.typefree.ime.i18n.tr
 import com.typefree.ime.ime.engine.Flypy14KeyHelper
 import com.typefree.ime.ime.engine.Flypy14KeySpec
@@ -146,6 +149,9 @@ fun BuiltInFlypy14Keyboard(
     onSwipeUpBackspaceClear: () -> Unit = {},
     onEnterOrNewline: () -> Unit,
     onSwitchToVoice: () -> Unit = {},
+    isVoiceRecording: Boolean = false,
+    onStartVoiceDictation: () -> Unit = {},
+    onStopVoiceDictation: () -> Unit = {},
     onSwitchSystemIme: () -> Unit,
     inputSessionToken: Int = 0,
     showKeyPopupPreview: Boolean = true,
@@ -476,11 +482,13 @@ fun BuiltInFlypy14Keyboard(
                         onSwipeUp = if (isIdleChineseComma) ({ onCommitChar(";") }) else null
                     )
 
-                    // 4. Spacebar with Mic-on-Bracket icon (2.31f, white)
+                    // 4. Spacebar with Mic-on-Bracket icon (2.31f, white): hold >=360ms dictates in-place
                     Flypy14SpaceBarKey(
+                        isVoiceRecording = isVoiceRecording,
                         onTap = onInsertSpace,
                         onMoveCursorByStep = onMoveCursorByStep,
-                        onLongPressVoice = onSwitchToVoice,
+                        onStartVoiceDictation = onStartVoiceDictation,
+                        onStopVoiceDictation = onStopVoiceDictation,
                         modifier = Modifier
                             .weight(2.31f)
                             .fillMaxHeight()
@@ -1152,22 +1160,28 @@ private fun Flypy14PunctKey(
 
 @Composable
 private fun Flypy14SpaceBarKey(
+    isVoiceRecording: Boolean = false,
     onTap: () -> Unit,
     onMoveCursorByStep: (Int) -> Unit,
-    onLongPressVoice: () -> Unit,
+    onStartVoiceDictation: () -> Unit,
+    onStopVoiceDictation: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val palette = LocalTypeFreeKeyboardPalette.current
+    val view = LocalView.current
     val density = LocalDensity.current
     val cursorStepPx = with(density) { 10.dp.toPx() }
     val slideStartPx = with(density) { 12.dp.toPx() }
 
     val currentOnTap by rememberUpdatedState(onTap)
     val currentOnMoveCursor by rememberUpdatedState(onMoveCursorByStep)
-    val currentOnLongPressVoice by rememberUpdatedState(onLongPressVoice)
+    val currentOnStartVoice by rememberUpdatedState(onStartVoiceDictation)
+    val currentOnStopVoice by rememberUpdatedState(onStopVoiceDictation)
 
     var isPressed by remember { mutableStateOf(false) }
     var isCursorSliding by remember { mutableStateOf(false) }
+    var isVoiceHolding by remember { mutableStateOf(false) }
+    val isVoiceActive = isVoiceHolding || isVoiceRecording
 
     Box(
         modifier = modifier
@@ -1180,15 +1194,17 @@ private fun Flypy14SpaceBarKey(
                         val startPos = down.position
                         isPressed = true
                         var isSliding = false
-                        var longPressed = false
+                        var voiceTriggered = false
                         var accumulatedDx = 0f
                         var prevX = startPos.x
 
                         val longPressJob = outerScope.launch {
-                            delay(420L)
-                            if (!isSliding) {
-                                longPressed = true
-                                currentOnLongPressVoice()
+                            delay(360L)
+                            if (!isSliding && !voiceTriggered) {
+                                voiceTriggered = true
+                                isVoiceHolding = true
+                                view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                                currentOnStartVoice()
                             }
                         }
 
@@ -1198,7 +1214,7 @@ private fun Flypy14SpaceBarKey(
                                 val event = awaitPointerEvent()
                                 val change = event.changes.firstOrNull { it.id == down.id } ?: break
                                 val totalDx = change.position.x - startPos.x
-                                if (!isSliding && abs(totalDx) >= slideStartPx) {
+                                if (!voiceTriggered && !isSliding && abs(totalDx) >= slideStartPx) {
                                     isSliding = true
                                     isCursorSliding = true
                                     longPressJob.cancel()
@@ -1222,11 +1238,16 @@ private fun Flypy14SpaceBarKey(
                             }
                         } finally {
                             longPressJob.cancel()
+                            val shouldStopVoice = voiceTriggered
                             isPressed = false
                             isCursorSliding = false
+                            isVoiceHolding = false
+                            if (shouldStopVoice) {
+                                currentOnStopVoice()
+                            }
                         }
 
-                        if (completed && !isSliding && !longPressed) {
+                        if (completed && !isSliding && !voiceTriggered) {
                             currentOnTap()
                         }
                     }
@@ -1235,13 +1256,29 @@ private fun Flypy14SpaceBarKey(
             .padding(horizontal = FLYPY14_CELL_HPAD, vertical = FLYPY14_CELL_VPAD)
     ) {
         Flypy14KeycapSurface(
-            isPressed = isPressed,
+            isPressed = isPressed && !isVoiceActive,
             cornerRadius = FLYPY14_KEY_CORNER,
-            faceColor = if (isPressed) palette.keyBorder else palette.keyCapBg,
-            borderColor = palette.keyBorder.copy(alpha = 0.50f),
+            faceColor = when {
+                isVoiceActive -> palette.capsuleSelectedBg
+                isPressed -> palette.keyBorder
+                else -> palette.keyCapBg
+            },
+            borderColor = if (isVoiceActive) TypeFreeEmerald.copy(alpha = 0.72f) else palette.keyBorder.copy(alpha = 0.50f),
             shadowColor = palette.keyShadow
         ) {
-            if (isCursorSliding) {
+            if (isVoiceActive) {
+                Text(
+                    text = tr("🎙 聆听中 · 松手上屏", "🎙 Listening · Release", "🎙 聆聽中 · 放開上屏"),
+                    color = if (palette.isDark) Color(0xFF6EE7B7) else Color(0xFF047857),
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(horizontal = 4.dp)
+                )
+            } else if (isCursorSliding) {
                 Text(
                     text = tr("◀ 光标 ▶", "◀ Cursor ▶", "◀ 游標 ▶"),
                     color = palette.keyTextPrimary,
@@ -1488,6 +1525,14 @@ fun BuiltInFlypy14KeyboardHost(
         onSwipeUpBackspaceClear = { onAction(ImeUiAction.ClearInputBox) },
         onEnterOrNewline = { onAction(ImeUiAction.EnterOrNewline) },
         onSwitchToVoice = { onAction(ImeUiAction.SelectTab(KeyboardTabMode.VOICE)) },
+        isVoiceRecording = uiState.voicePhase is VoicePhase.Recording,
+        onStartVoiceDictation = {
+            if (uiState.flypyComposingCode.isNotEmpty()) {
+                onAction(ImeUiAction.FlushFlypyComposing)
+            }
+            onAction(ImeUiAction.MicPressDown(VoiceIntentMode.DICTATE))
+        },
+        onStopVoiceDictation = { onAction(ImeUiAction.MicPressUp) },
         onSwitchSystemIme = { onAction(ImeUiAction.SwitchKeyboard) },
         inputSessionToken = uiState.inputSessionToken,
         showKeyPopupPreview = showKeyPopupPreview,

@@ -1,15 +1,29 @@
 package com.typefree.ime.ime
 
+import android.view.inputmethod.InputConnection
+import com.typefree.ime.data.AppRepository
+import com.typefree.ime.data.HistoryRetention
+import com.typefree.ime.data.InMemoryKeyValueStore
 import com.typefree.ime.data.InputScheme
+import com.typefree.ime.data.JvmAesGcmCipher
+import com.typefree.ime.data.SecretVault
 import com.typefree.ime.ime.engine.EngineResult
 import com.typefree.ime.ime.engine.Flypy14KeyHelper
 import com.typefree.ime.ime.engine.KeyInput
 import com.typefree.ime.ime.engine.RimeDataManager
 import com.typefree.ime.ime.engine.RimeInputEngine
+import com.typefree.ime.ime.flypy.FlypyCandidate
+import com.typefree.ime.network.AiPipelineEngine
 import com.typefree.rime.RimeBridge
 import com.typefree.rime.RimeCandidate
 import com.typefree.rime.RimeContextSnapshot
 import com.typefree.rime.RimeSessionClient
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -26,6 +40,7 @@ class Flypy14KeyTest {
         override var wordCount: Int = 18000
 
         private val buffer = StringBuilder()
+        private var partialPrefix: String = ""
 
         private val fixtures: Map<String, Pair<String, List<RimeCandidate>>> = mapOf(
             "CA" to ("CA" to listOf(
@@ -41,6 +56,13 @@ class Flypy14KeyTest {
             "vs'GO" to ("vs'GO" to listOf(
                 RimeCandidate("中国", "zhong guo"),
                 RimeCandidate("钟锅", "zhong guo")
+            )),
+            "cs'GO" to ("cs'GO" to listOf(
+                RimeCandidate("从过", "cong guo"),
+                RimeCandidate("从", "cong")
+            )),
+            "va'GO" to ("va'GO" to listOf(
+                RimeCandidate("扎锅", "zha guo")
             )),
             "vs'go" to ("vs'go" to listOf(
                 RimeCandidate("中国", "zhong guo")
@@ -64,7 +86,11 @@ class Flypy14KeyTest {
 
         override fun processKey(keyCode: Int, mask: Int): Boolean {
             if (keyCode == RimeBridge.XK_BackSpace) {
-                if (buffer.isNotEmpty()) buffer.deleteCharAt(buffer.length - 1)
+                if (partialPrefix.isNotEmpty()) {
+                    partialPrefix = ""
+                } else if (buffer.isNotEmpty()) {
+                    buffer.deleteCharAt(buffer.length - 1)
+                }
                 return true
             }
             buffer.append(keyCode.toChar())
@@ -72,6 +98,7 @@ class Flypy14KeyTest {
         }
 
         override fun processKeyText(keys: String): RimeContextSnapshot {
+            partialPrefix = ""
             buffer.clear()
             buffer.append(keys)
             return getContext(pageSize)
@@ -79,6 +106,13 @@ class Flypy14KeyTest {
 
         override fun getContext(maxCandidates: Int): RimeContextSnapshot {
             val raw = buffer.toString()
+            if (partialPrefix.isNotEmpty() && raw == "cs'GO") {
+                return RimeContextSnapshot(
+                    preedit = "${partialPrefix}GO",
+                    rawInput = raw,
+                    candidates = listOf(RimeCandidate("过", "guo"), RimeCandidate("国", "guo"))
+                )
+            }
             val hit = fixtures[raw]
             return RimeContextSnapshot(
                 preedit = hit?.first ?: raw,
@@ -88,19 +122,29 @@ class Flypy14KeyTest {
         }
 
         override fun selectCandidate(index: Int): String? {
+            val raw = buffer.toString()
+            if (raw == "cs'GO" && index == 1) {
+                partialPrefix = "从"
+                return null
+            }
             val picked = getContext(pageSize).candidates.getOrNull(index)?.text
-            if (picked != null) buffer.clear()
+            if (picked != null) {
+                partialPrefix = ""
+                buffer.clear()
+            }
             return picked
         }
 
         override fun commitComposition(): String? {
             val first = getContext(pageSize).candidates.firstOrNull()?.text
+            partialPrefix = ""
             buffer.clear()
             return first
         }
 
         override fun getCommit(): String? = null
         override fun clearComposition() {
+            partialPrefix = ""
             buffer.clear()
         }
 
@@ -207,16 +251,33 @@ class Flypy14KeyTest {
         assertEquals("zhong guo", state1.preedit)
         assertTrue("zhong" in state1.t9Syllables)
 
-        // Lock first ambiguous slot to "zhong" -> "vs'GO"
+        // Lock first ambiguous slot to "zhong" -> "vs'GO"; keep sibling pinyin selectable on the left
         engine.lockT9Syllable("zhong")
         val stateLocked = engine.state.value
         assertEquals("vs'GO", stateLocked.rawCode)
-        assertTrue("guo" in stateLocked.t9Syllables)
+        assertEquals("zhong", stateLocked.activeSyllable)
+        assertTrue(stateLocked.t9Syllables.containsAll(listOf("zhong", "cong", "zha", "ca")))
 
-        // Backspace O, G -> reaches "vs'" (pruned to "vs"), then next backspace unlocks "vs" -> "CA"
+        // Re-select another left-rail pinyin "cong" -> swaps to "cs'GO" and updates right candidates
+        engine.lockT9Syllable("cong")
+        val stateCong = engine.state.value
+        assertEquals("cs'GO", stateCong.rawCode)
+        assertEquals("cong", stateCong.activeSyllable)
+        assertEquals("从过", stateCong.candidates.firstOrNull()?.text)
+
+        // Re-select "zha" -> swaps to "va'GO"
+        engine.lockT9Syllable("zha")
+        val stateZha = engine.state.value
+        assertEquals("va'GO", stateZha.rawCode)
+        assertEquals("zha", stateZha.activeSyllable)
+        assertEquals("扎锅", stateZha.candidates.firstOrNull()?.text)
+
+        // Switch back to "zhong", then backspace O, G -> "vs", then unlock "vs" -> "CA"
+        engine.lockT9Syllable("zhong")
         engine.onKey(KeyInput.Backspace())
         engine.onKey(KeyInput.Backspace())
         assertEquals("vs", engine.state.value.rawCode)
+        assertEquals("", engine.state.value.activeSyllable)
         engine.onKey(KeyInput.Backspace())
         assertEquals("CA", engine.state.value.rawCode)
         assertEquals("中", engine.state.value.candidates.firstOrNull()?.text)
@@ -225,6 +286,101 @@ class Flypy14KeyTest {
         val committed = engine.onKey(KeyInput.Enter) as? EngineResult.Commit
         assertEquals("中", committed?.text)
         assertFalse(engine.state.value.isComposing)
+    }
+
+    @Test
+    fun partialSelection_clearsActiveSyllable_andAdvancesPinyinOptionsToNextSyllable() {
+        val client = FakeFlypy14RimeClient()
+        val engine = RimeInputEngine(
+            rimeBridge = client,
+            initialScheme = InputScheme.RIME_DOUBLE_PINYIN_FLYPY_14,
+            externalEnhancedSchemePredicate = { false }
+        )
+        for (ch in "CAGO") {
+            engine.onKey(KeyInput.CharKey(ch))
+        }
+        engine.lockT9Syllable("cong")
+        assertEquals("cong", engine.state.value.activeSyllable)
+
+        // Partial selection (index 1 picks "从" while "GO" remains)
+        val res = engine.select(1)
+        assertEquals(EngineResult.Consumed, res)
+        val afterPartial = engine.state.value
+        assertTrue(afterPartial.isComposing)
+        assertEquals("", afterPartial.activeSyllable)
+        assertEquals("过", afterPartial.candidates.firstOrNull()?.text)
+        assertTrue("guo" in afterPartial.t9Syllables)
+    }
+
+    @Test
+    fun insertSpace_chainsPredictionCandidatesBeforeInsertingLiteralSpace() {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        try {
+            val repo = AppRepository(
+                appContext = null,
+                publicStore = InMemoryKeyValueStore(),
+                secretVault = SecretVault(store = InMemoryKeyValueStore(), cipher = JvmAesGcmCipher())
+            )
+            val committed = mutableListOf<String>()
+            val state = MutableStateFlow(
+                ImeUiState(
+                    tabMode = KeyboardTabMode.QWERTY,
+                    isFlypyChineseMode = true,
+                    activeInputScheme = InputScheme.RIME_DOUBLE_PINYIN_FLYPY_14,
+                    predictionCandidates = listOf(FlypyCandidate(text = "方案"), FlypyCandidate(text = "计划"))
+                )
+            )
+            val host = object : ImeHostCallbacks {
+                override val scope: CoroutineScope = scope
+                override val repository: AppRepository = repo
+                override val aiEngine: AiPipelineEngine = AiPipelineEngine()
+                override val stateFlow: MutableStateFlow<ImeUiState> = state
+                override fun currentInputConnection(): InputConnection? = null
+                override fun performKeyFeedback(strong: Boolean) {}
+                override fun performHaptic(strong: Boolean) {}
+                override fun showQuickActionToast(message: String) {}
+                override fun commitDirectText(
+                    text: String,
+                    recordUndo: Boolean,
+                    markManualEdit: Boolean,
+                    playFeedback: Boolean
+                ) {
+                    committed.add(text)
+                }
+                override fun pushUndoSnapshot(snapshot: UndoSnapshot?) {}
+                override fun peekTopUndoSnapshot(): UndoSnapshot? = null
+                override fun recordManualEditTouch() {}
+                override fun tryAutoLearnFromRecentEdit() {}
+                override fun onDictationCommittedForAutoLearn(fullBufferAfterCommit: String) {}
+                override fun clearAutoLearnBaseline() {}
+                override fun readSelectedTextSafely(): String = ""
+                override fun readSurroundingBeforeCursor(maxChars: Int): String = ""
+                override fun readFullEditorTextSafely(): String = ""
+                override fun readSystemClipboardText(): String = ""
+                override fun syncSystemClipboardIfNeeded(allowFreshBanner: Boolean) {}
+                override fun archiveWavForHistory(wavFile: File, retention: HistoryRetention): File = wavFile
+                override fun getLastRecordingWavFile(): File = File("dummy.wav")
+                override fun hasRetryWavFile(): Boolean = false
+            }
+
+            val controller = TypingController(host = host)
+
+            // 1st Space confirms prediction[0] ("方案") instead of inserting space
+            controller.insertSpace()
+            assertEquals(listOf("方案"), committed)
+
+            // Simulate next chained prediction and confirm via 2nd Space
+            state.update { it.copy(predictionCandidates = listOf(FlypyCandidate(text = "评审"))) }
+            controller.insertSpace()
+            assertEquals(listOf("方案", "评审"), committed)
+
+            // Once predictions are empty, Space inserts literal " "
+            state.update { it.copy(predictionCandidates = emptyList()) }
+            controller.insertSpace()
+            assertEquals(listOf("方案", "评审", " "), committed)
+        } finally {
+            scope.cancel()
+        }
     }
 
     @Test
