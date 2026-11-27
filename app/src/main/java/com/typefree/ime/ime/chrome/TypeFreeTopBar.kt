@@ -291,7 +291,8 @@ fun TypeFreeTopBar(
     onStartVoiceDictation: () -> Unit = {},
     onStopVoiceDictation: () -> Unit = {},
     onShowImePicker: () -> Unit = {},
-    onHideKeyboard: () -> Unit = {}
+    onHideKeyboard: () -> Unit = {},
+    onToggleEmoji: () -> Unit = {}
 ) {
     val palette = LocalTypeFreeKeyboardPalette.current
     val appLang = LocalAppLanguage.current
@@ -702,13 +703,17 @@ fun TypeFreeTopBar(
         Spacer(modifier = Modifier.width(4.dp))
 
         // Right Cluster:
-        // - In QWERTY idle mode: [🌐 Switch IME] + [⌨⌄ Hide Keyboard] (only voice entry is holding Spacebar!).
+        // - In QWERTY idle mode: [😊 Emoji] + [🌐 Switch IME] + [⌨⌄ Hide Keyboard].
         // - In TRANSLATE / ToolPanel mode: Compact 2-Segment Track [鹤 打字 | 文A] + [⌨⌄]
         if (isQwertyRightCluster) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                TopBarEmojiIconButton(
+                    isOpen = uiState.isEmojiOpen,
+                    onClick = onToggleEmoji
+                )
                 TopBarImeSwitchButton(onClick = onShowImePicker)
                 TopBarHideKeyboardButton(onClick = onHideKeyboard)
             }
@@ -1032,6 +1037,33 @@ fun TopBarUndoIconButton(
             contentDescription = "撤销",
             tint = palette.keyTextPrimary,
             modifier = Modifier.size(17.dp)
+        )
+    }
+}
+
+@Composable
+fun TopBarEmojiIconButton(
+    isOpen: Boolean,
+    onClick: () -> Unit
+) {
+    val palette = LocalTypeFreeKeyboardPalette.current
+    val bgColor = if (isOpen) palette.primaryMicSolid else palette.keyCapBg
+    val borderColor = if (isOpen) Color.Transparent else palette.keyBorder
+    val iconTint = if (isOpen) palette.onPrimaryMic else palette.keyTextPrimary
+    Box(
+        modifier = Modifier
+            .requiredSize(34.dp)
+            .clip(CircleShape)
+            .background(bgColor)
+            .border(1.dp, borderColor, CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = TypeFreeIcons.EmojiSmile,
+            contentDescription = tr("表情 Emoji", "Emoji", "表情 Emoji"),
+            tint = iconTint,
+            modifier = Modifier.size(18.dp)
         )
     }
 }

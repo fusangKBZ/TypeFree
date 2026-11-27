@@ -935,4 +935,28 @@ object TypeFreeIcons {
             }
         }.build()
     }
+
+    /** Monochrome smiling face icon matching uniform 1.9dp stroke style for the Emoji panel button. */
+    val EmojiSmile: ImageVector by lazy {
+        ImageVector.Builder("EmojiSmile", 24.dp, 24.dp, 24f, 24f).apply {
+            path(
+                stroke = SolidColor(Color.White),
+                strokeLineWidth = 1.9f,
+                strokeLineCap = StrokeCap.Round,
+                strokeLineJoin = StrokeJoin.Round
+            ) {
+                moveTo(12f, 3f)
+                arcTo(9f, 9f, 0f, isMoreThanHalf = true, isPositiveArc = false, 12f, 21f)
+                arcTo(9f, 9f, 0f, isMoreThanHalf = true, isPositiveArc = false, 12f, 3f)
+                // Eyes
+                moveTo(9f, 9.8f)
+                lineTo(9.1f, 9.8f)
+                moveTo(15f, 9.8f)
+                lineTo(15.1f, 9.8f)
+                // Smile curve
+                moveTo(8.5f, 14.2f)
+                curveTo(9.5f, 16.4f, 14.5f, 16.4f, 15.5f, 14.2f)
+            }
+        }.build()
+    }
 }

@@ -383,7 +383,8 @@ class TypeFreeInputMethodService : ComposeInputMethodService(), ImeHostCallbacks
                 jevUserBottomLine = "",
                 jevExcludedReplies = emptyList(),
                 isFullScreenPeekCapturing = false,
-                isJevContextInspectorOpen = false
+                isJevContextInspectorOpen = false,
+                isEmojiOpen = false
             )
         }
         super.onFinishInputView(finishingInput)
@@ -625,6 +626,7 @@ class TypeFreeInputMethodService : ComposeInputMethodService(), ImeHostCallbacks
                 isPunctuationStripOpen = false,
                 isHistoryDrawerOpen = false,
                 isClipboardOpen = false,
+                isEmojiOpen = false,
                 isToolPanelOpen = false,
                 isToolPanelHeightExpanded = false,
                 flypyComposingCode = "",
@@ -749,6 +751,9 @@ class TypeFreeInputMethodService : ComposeInputMethodService(), ImeHostCallbacks
             ImeUiAction.DismissSpeakToEdit -> voiceController.dismissSpeakToEditForTurn()
             ImeUiAction.OpenClipboard -> openClipboardPanel()
             ImeUiAction.CloseClipboard -> closeClipboardPanel()
+            ImeUiAction.ToggleEmojiPanel -> toggleEmojiPanel()
+            ImeUiAction.CloseEmojiPanel -> closeEmojiPanel()
+            is ImeUiAction.CommitEmoji -> commitEmoji(action.emoji)
             ImeUiAction.ToggleStylePicker -> toggleStylePicker()
             ImeUiAction.OpenStylePickerFromToolPanel -> openStylePickerFromToolPanel()
             ImeUiAction.TogglePunctuationStrip -> voiceController.togglePunctuationStrip()
@@ -897,6 +902,7 @@ class TypeFreeInputMethodService : ComposeInputMethodService(), ImeHostCallbacks
                 isPunctuationStripOpen = false,
                 isStylePickerExpanded = false,
                 isClipboardOpen = false,
+                isEmojiOpen = false,
                 isToolPanelOpen = false,
                 isToolPanelHeightExpanded = false,
                 flypyComposingCode = "",
@@ -1367,6 +1373,7 @@ class TypeFreeInputMethodService : ComposeInputMethodService(), ImeHostCallbacks
         _imeState.update { prev ->
             prev.copy(
                 isClipboardOpen = true,
+                isEmojiOpen = false,
                 isToolPanelOpen = false,
                 isToolPanelHeightExpanded = false,
                 freshClipboardBannerItem = null,
@@ -1380,6 +1387,49 @@ class TypeFreeInputMethodService : ComposeInputMethodService(), ImeHostCallbacks
     private fun closeClipboardPanel() {
         performKeyFeedback(strong = false)
         _imeState.update { it.copy(isClipboardOpen = false) }
+    }
+
+    private fun toggleEmojiPanel() {
+        performKeyFeedback(strong = false)
+        val willOpen = !_imeState.value.isEmojiOpen
+        if (willOpen) {
+            if (_imeState.value.isFlypyComposing) {
+                typingController.resetComposing()
+            } else {
+                typingController.onPanelSwitched()
+            }
+            voiceController.stopRecordingOnTabSwitchOrWindowHidden()
+        }
+        _imeState.update { prev ->
+            prev.copy(
+                isEmojiOpen = willOpen,
+                isClipboardOpen = false,
+                isToolPanelOpen = false,
+                isToolPanelHeightExpanded = false,
+                voicePhase = if (willOpen && prev.voicePhase is VoicePhase.Recording) VoicePhase.Idle else prev.voicePhase,
+                isStylePickerExpanded = false,
+                isPunctuationStripOpen = false
+            )
+        }
+    }
+
+    private fun closeEmojiPanel() {
+        performKeyFeedback(strong = false)
+        _imeState.update { it.copy(isEmojiOpen = false) }
+    }
+
+    private fun commitEmoji(emoji: String) {
+        if (emoji.isEmpty()) return
+        commitDirectText(
+            text = emoji,
+            recordUndo = true,
+            markManualEdit = true,
+            playFeedback = true
+        )
+        _imeState.update { prev ->
+            val nextRecent = (listOf(emoji) + prev.recentEmojis.filter { it != emoji }).take(24)
+            prev.copy(recentEmojis = nextRecent)
+        }
     }
 
     private fun dismissFreshClipboardBanner() {
@@ -1487,6 +1537,7 @@ class TypeFreeInputMethodService : ComposeInputMethodService(), ImeHostCallbacks
                 isToolPanelOpen = willOpen,
                 isToolPanelHeightExpanded = if (willOpen) prev.isToolPanelHeightExpanded else false,
                 isClipboardOpen = false,
+                isEmojiOpen = false,
                 voicePhase = if (willOpen && prev.voicePhase is VoicePhase.Recording) VoicePhase.Idle else prev.voicePhase,
                 isStylePickerExpanded = false,
                 isPunctuationStripOpen = false

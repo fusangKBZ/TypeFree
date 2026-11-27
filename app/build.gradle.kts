@@ -48,16 +48,20 @@ android {
         }
     }
 
-    fun signingValue(propKey: String, envKey: String): String? {
+    fun signingValue(propKey: String, envKey: String, altEnvKey: String? = null): String? {
         return keystoreProperties.getProperty(propKey)?.trim()?.takeIf { it.isNotEmpty() }
             ?: System.getenv(envKey)?.trim()?.takeIf { it.isNotEmpty() }
+            ?: altEnvKey?.let { System.getenv(it)?.trim()?.takeIf { v -> v.isNotEmpty() } }
     }
 
-    val releaseStorePath = signingValue("storeFile", "TYPEFREE_KEYSTORE_PATH")
-    val releaseStorePassword = signingValue("storePassword", "TYPEFREE_KEYSTORE_PASSWORD")
-    val releaseKeyAlias = signingValue("keyAlias", "TYPEFREE_KEY_ALIAS")
-    val releaseKeyPassword = signingValue("keyPassword", "TYPEFREE_KEY_PASSWORD")
-    val releaseStoreFile = releaseStorePath?.let { path -> rootProject.file(path) }
+    val releaseStorePath = signingValue("storeFile", "TYPENEO_KEYSTORE_PATH", "TYPEFREE_KEYSTORE_PATH")
+    val releaseStorePassword = signingValue("storePassword", "TYPENEO_KEYSTORE_PASSWORD", "TYPEFREE_KEYSTORE_PASSWORD")
+    val releaseKeyAlias = signingValue("keyAlias", "TYPENEO_KEY_ALIAS", "TYPEFREE_KEY_ALIAS")
+    val releaseKeyPassword = signingValue("keyPassword", "TYPENEO_KEY_PASSWORD", "TYPEFREE_KEY_PASSWORD")
+    val releaseStoreFile = releaseStorePath?.let { path ->
+        val f = file(path)
+        if (f.isFile) f else rootProject.file(path)
+    }
 
     signingConfigs {
         if (
@@ -92,6 +96,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            signingConfigs.findByName("release")?.let { stable ->
+                signingConfig = stable
+            }
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(

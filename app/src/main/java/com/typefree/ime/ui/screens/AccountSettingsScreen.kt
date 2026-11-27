@@ -125,52 +125,7 @@ fun AccountSettingsScreen(
         }
     }
 
-    val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
     val settings by repository.settings.collectAsState()
-    var isCheckingUpdate by remember { mutableStateOf(false) }
-    var updateDialogState by remember { mutableStateOf<UpdateDialogState?>(null) }
-    var availableUpdate by remember {
-        mutableStateOf<UpdateCheckInfo?>(
-            AppUpdateChecker.peekCachedUpdate(BuildConfig.VERSION_NAME)
-        )
-    }
-    var dismissedUpdateTag by rememberSaveable { mutableStateOf<String?>(null) }
-
-    LaunchedEffect(settings.offlineConfig.mode) {
-        if (settings.offlineConfig.mode == OfflineMode.OFFLINE_ONLY) return@LaunchedEffect
-        val latest = AppUpdateChecker.fetchLatestUpdateSilentlyIfNeeded(
-            currentVersion = BuildConfig.VERSION_NAME,
-            isPrivateDictBuild = BuildConfig.USE_PRIVATE_DICT
-        )
-        if (latest != null && latest.hasUpdate) {
-            availableUpdate = latest
-        }
-    }
-
-    fun triggerUpdateCheck() {
-        if (isCheckingUpdate) return
-        isCheckingUpdate = true
-        coroutineScope.launch {
-            val result = AppUpdateChecker.fetchLatestUpdate(
-                currentVersion = BuildConfig.VERSION_NAME,
-                isPrivateDictBuild = BuildConfig.USE_PRIVATE_DICT
-            )
-            isCheckingUpdate = false
-            result.onSuccess { info ->
-                availableUpdate = info.takeIf { it.hasUpdate }
-                updateDialogState = if (info.hasUpdate) {
-                    UpdateDialogState.UpdateAvailable(info)
-                } else {
-                    UpdateDialogState.UpToDate(info)
-                }
-            }.onFailure { err ->
-                updateDialogState = UpdateDialogState.Error(
-                    err.message ?: "检查更新失败，请稍后重试或前往 GitHub Releases 手动查看"
-                )
-            }
-        }
-    }
 
     fun selectSubTab(index: Int) {
         val resolved = if (index in validSubTabs) index else AppDestinations.SUBTAB_API
@@ -198,8 +153,6 @@ fun AccountSettingsScreen(
                     fontWeight = FontWeight.ExtraBold
                 )
                 Surface(
-                    onClick = { triggerUpdateCheck() },
-                    enabled = !isCheckingUpdate,
                     shape = RoundedCornerShape(50),
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
@@ -209,15 +162,8 @@ fun AccountSettingsScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
-                        if (isCheckingUpdate) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(11.dp),
-                                strokeWidth = 1.6.dp,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
                         Text(
-                            text = if (isCheckingUpdate) "检查更新中…" else "v${BuildConfig.VERSION_NAME} · BYOK",
+                            text = "TypeNeo v${BuildConfig.VERSION_NAME}",
                             style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -226,20 +172,6 @@ fun AccountSettingsScreen(
             }
 
             // Three-Segment Capsule Bar
-            val bannerUpdate = availableUpdate?.takeIf { it.hasUpdate && it.latestTag != dismissedUpdateTag }
-            AnimatedVisibility(visible = bannerUpdate != null) {
-                bannerUpdate?.let { info ->
-                    SettingsUpdatePromptBanner(
-                        info = info,
-                        onUpdateClick = {
-                            updateDialogState = UpdateDialogState.UpdateAvailable(info)
-                        },
-                        onDismiss = {
-                            dismissedUpdateTag = info.latestTag
-                        }
-                    )
-                }
-            }
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(13.dp),
@@ -302,24 +234,11 @@ fun AccountSettingsScreen(
                 AppDestinations.SUBTAB_PREFERENCES -> {
                     AppearanceAndPreferencesPane(
                         repository = repository,
-                        onJumpToApiSubTab = { selectSubTab(AppDestinations.SUBTAB_API) },
-                        isCheckingUpdate = isCheckingUpdate,
-                        onCheckUpdateClick = { triggerUpdateCheck() },
-                        onOpenReleasesClick = {
-                            openExternalUrl(context, AppUpdateChecker.GITHUB_RELEASES_PAGE_URL)
-                        }
+                        onJumpToApiSubTab = { selectSubTab(AppDestinations.SUBTAB_API) }
                     )
                 }
             }
         }
-    }
-
-    updateDialogState?.let { dialogState ->
-        AppUpdateDialog(
-            state = dialogState,
-            onOpenUrl = { url -> openExternalUrl(context, url) },
-            onDismiss = { updateDialogState = null }
-        )
     }
 }
 
@@ -771,10 +690,7 @@ private fun AddTranslationLanguageDialog(
 @Composable
 private fun AppearanceAndPreferencesPane(
     repository: AppRepository,
-    onJumpToApiSubTab: () -> Unit = {},
-    isCheckingUpdate: Boolean = false,
-    onCheckUpdateClick: () -> Unit = {},
-    onOpenReleasesClick: () -> Unit = {}
+    onJumpToApiSubTab: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val settings by repository.settings.collectAsState()
@@ -1624,45 +1540,6 @@ private fun AppearanceAndPreferencesPane(
                 }
 
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    FilledTonalButton(
-                        onClick = onCheckUpdateClick,
-                        enabled = !isCheckingUpdate,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(10.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
-                    ) {
-                        if (isCheckingUpdate) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(14.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("正在检查…", style = MaterialTheme.typography.labelLarge)
-                        } else {
-                            Icon(
-                                imageVector = Icons.Default.Refresh,
-                                contentDescription = null,
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("检查更新", style = MaterialTheme.typography.labelLarge)
-                        }
-                    }
-
-                    OutlinedButton(
-                        onClick = onOpenReleasesClick,
-                        shape = RoundedCornerShape(10.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
-                    ) {
-                        Text("GitHub Releases", style = MaterialTheme.typography.labelLarge)
-                    }
-                }
-
-                Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
@@ -1673,7 +1550,7 @@ private fun AppearanceAndPreferencesPane(
                         modifier = Modifier.size(14.dp)
                     )
                     Text(
-                        text = "TypeFree Android · v${BuildConfig.VERSION_NAME}",
+                        text = "TypeNeo Android · v${BuildConfig.VERSION_NAME}",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1682,221 +1559,6 @@ private fun AppearanceAndPreferencesPane(
         }
 
         Spacer(modifier = Modifier.height(12.dp))
-    }
-}
-
-private sealed interface UpdateDialogState {
-    data class UpdateAvailable(val info: UpdateCheckInfo) : UpdateDialogState
-    data class UpToDate(val info: UpdateCheckInfo) : UpdateDialogState
-    data class Error(val message: String) : UpdateDialogState
-}
-
-@Composable
-private fun AppUpdateDialog(
-    state: UpdateDialogState,
-    onOpenUrl: (String) -> Unit,
-    onDismiss: () -> Unit
-) {
-    when (state) {
-        is UpdateDialogState.UpdateAvailable -> {
-            val info = state.info
-            AlertDialog(
-                onDismissRequest = onDismiss,
-                title = { Text("发现新版本 v${info.latestVersion}") },
-                text = {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        if (info.requiresPrivateDictWarning) {
-                            Surface(
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp),
-                                color = TypeFreeAmber.copy(alpha = 0.14f),
-                                border = BorderStroke(1.dp, TypeFreeAmber.copy(alpha = 0.65f))
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(10.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.Top
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Warning,
-                                        contentDescription = null,
-                                        tint = TypeFreeAmber,
-                                        modifier = Modifier
-                                            .padding(top = 2.dp)
-                                            .size(18.dp)
-                                    )
-                                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                        Text(
-                                            text = "防误覆盖提醒（私有词库定制包）",
-                                            style = MaterialTheme.typography.labelLarge,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                        Text(
-                                            text = "当前为私有小鹤全量词库定制包，GitHub 公开 Release APK 仅含公开词表，直接覆盖安装会替换内置私有词库。",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            lineHeight = 18.sp
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(10.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = "v${info.currentVersion} → v${info.latestVersion}",
-                                    style = MaterialTheme.typography.labelLarge.copy(
-                                        fontFamily = FontFamily.Monospace
-                                    ),
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                val dateText = info.publishedAt.take(10)
-                                if (dateText.isNotBlank()) {
-                                    Text(
-                                        text = dateText,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                        }
-
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(max = 260.dp),
-                            shape = RoundedCornerShape(10.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .verticalScroll(rememberScrollState())
-                                    .padding(10.dp),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                if (info.releaseName.isNotBlank() &&
-                                    !info.releaseName.equals(info.latestTag, ignoreCase = true)
-                                ) {
-                                    Text(
-                                        text = info.releaseName,
-                                        style = MaterialTheme.typography.labelLarge,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                }
-                                Text(
-                                    text = info.releaseNotes,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    lineHeight = 19.sp
-                                )
-                            }
-                        }
-                    }
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            onOpenUrl(info.apkDownloadUrl ?: info.htmlUrl)
-                            onDismiss()
-                        }
-                    ) {
-                        Text("浏览器下载 APK")
-                    }
-                },
-                dismissButton = {
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        TextButton(
-                            onClick = {
-                                onOpenUrl(info.htmlUrl)
-                                onDismiss()
-                            }
-                        ) {
-                            Text("打开发布页")
-                        }
-                        TextButton(onClick = onDismiss) {
-                            Text("暂不更新")
-                        }
-                    }
-                }
-            )
-        }
-
-        is UpdateDialogState.UpToDate -> {
-            val info = state.info
-            AlertDialog(
-                onDismissRequest = onDismiss,
-                title = { Text("已是最新版本") },
-                text = {
-                    Text(
-                        text = "当前版本 v${info.currentVersion} 已是最新正式版（GitHub 最新版本：${info.latestTag}）。",
-                        style = MaterialTheme.typography.bodyMedium,
-                        lineHeight = 20.sp
-                    )
-                },
-                confirmButton = {
-                    TextButton(onClick = onDismiss) {
-                        Text("知道了")
-                    }
-                },
-                dismissButton = {
-                    TextButton(
-                        onClick = {
-                            onOpenUrl(info.htmlUrl)
-                            onDismiss()
-                        }
-                    ) {
-                        Text("查看 Releases")
-                    }
-                }
-            )
-        }
-
-        is UpdateDialogState.Error -> {
-            AlertDialog(
-                onDismissRequest = onDismiss,
-                title = { Text("检查更新失败") },
-                text = {
-                    Text(
-                        text = state.message,
-                        style = MaterialTheme.typography.bodyMedium,
-                        lineHeight = 20.sp
-                    )
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            onOpenUrl(AppUpdateChecker.GITHUB_RELEASES_PAGE_URL)
-                            onDismiss()
-                        }
-                    ) {
-                        Text("手动查看 Releases")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = onDismiss) {
-                        Text("关闭")
-                    }
-                }
-            )
-        }
     }
 }
 

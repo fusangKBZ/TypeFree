@@ -49,6 +49,7 @@ import com.typefree.ime.ime.chrome.InlineStyleSelectorStrip
 import com.typefree.ime.ime.chrome.TypeFreeTopBar
 import com.typefree.ime.ime.panels.ArcTranslateFullPanel
 import com.typefree.ime.ime.panels.AskAiCardPanel
+import com.typefree.ime.ime.panels.EmojiKeyboardPanel
 import com.typefree.ime.ime.panels.HelpMeWritePanel
 import com.typefree.ime.ime.panels.JevCopilotPanel
 import com.typefree.ime.ime.panels.RealtimeTranslatePanel
@@ -151,7 +152,7 @@ fun KeyboardScreen(
     val metrics = LocalKeyboardMetrics.current
     val resolvedSubPanel = uiState.resolvedVoiceSubPanel
     val isInSubPanel = uiState.tabMode == KeyboardTabMode.VOICE && resolvedSubPanel != VoiceSubPanel.NONE
-    val isActiveQwertyGrid = !uiState.isClipboardOpen && !uiState.isToolPanelOpen &&
+    val isActiveQwertyGrid = !uiState.isClipboardOpen && !uiState.isEmojiOpen && !uiState.isToolPanelOpen &&
         !isInSubPanel && !uiState.isArcTranslateActive && uiState.tabMode == KeyboardTabMode.QWERTY
     val fiveKeyBottomRowActive = settings.codetableFiveKeyBottomRow && (
         uiState.activeInputScheme == InputScheme.FLYPY_TABLE ||
@@ -245,6 +246,10 @@ fun KeyboardScreen(
                             onInsertSpace = onInsertSpace,
                             onBackspace = onBackspace
                         )
+                    }
+
+                    uiState.isEmojiOpen -> {
+                        EmojiKeyboardPanel(uiState.recentEmojis, { onAction(ImeUiAction.CommitEmoji(it)) }, onBackspace, { onAction(ImeUiAction.CloseEmojiPanel) }, onHideKeyboard)
                     }
 
                     uiState.tabMode == KeyboardTabMode.VOICE &&
@@ -395,7 +400,8 @@ fun KeyboardScreen(
                                         onStopVoiceDictation = onMicPressUp,
                                         onOpenAskAiCard = { onAction(ImeUiAction.OpenAskAiCard) },
                                         onShowImePicker = onShowImePicker,
-                                        onHideKeyboard = onHideKeyboard
+                                        onHideKeyboard = onHideKeyboard,
+                                        onToggleEmoji = { onAction(ImeUiAction.ToggleEmojiPanel) }
                                     )
                                 }
                             }

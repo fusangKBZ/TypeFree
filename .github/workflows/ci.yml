@@ -153,13 +153,30 @@ jobs:
       - name: Run Android Debug unit tests
         run: ./gradlew ${{ steps.tasks.outputs.unit_task }} --no-daemon --stacktrace
 
+      - name: Prepare persistent TypeNeo signing keystore
+        if: env.HAS_KEYSTORE == 'true'
+        env:
+          HAS_KEYSTORE: ${{ secrets.TYPENEO_KEYSTORE_BASE64 != '' }}
+          KEYSTORE_B64: ${{ secrets.TYPENEO_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          KEYSTORE_OUT="$RUNNER_TEMP/typeneo-stable.jks"
+          printf '%s' "$KEYSTORE_B64" | tr -d ' \n\r' | base64 --decode > "$KEYSTORE_OUT"
+          test -s "$KEYSTORE_OUT"
+          echo "TYPENEO_KEYSTORE_PATH=$KEYSTORE_OUT" >> "$GITHUB_ENV"
+
       - name: Assemble Standard Debug APK
+        env:
+          TYPENEO_KEYSTORE_PASSWORD: ${{ secrets.TYPENEO_KEYSTORE_PASSWORD }}
+          TYPENEO_KEY_ALIAS: ${{ secrets.TYPENEO_KEY_ALIAS }}
+          TYPENEO_KEY_PASSWORD: ${{ secrets.TYPENEO_KEY_PASSWORD }}
         run: |
           ./gradlew ${{ steps.tasks.outputs.apk_task }} --no-daemon --stacktrace
           APK_PATH=$(find "${{ steps.tasks.outputs.apk_dir }}" -name "*.apk" | head -n 1)
           test -f "$APK_PATH"
           cp "$APK_PATH" TypeNeo-standard-debug.apk
           sha256sum TypeNeo-standard-debug.apk | tee TypeNeo-standard-debug.apk.sha256
+          keytool -printcert -jarfile TypeNeo-standard-debug.apk | grep -E "Owner:|SHA256:" || true
 
       - name: Upload Standard Debug APK & test reports
         if: always()

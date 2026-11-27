@@ -131,6 +131,8 @@ data class ImeUiState(
     val flypyCandidates: List<FlypyCandidate> = emptyList(),
     val isFlypyCandidateSheetExpanded: Boolean = false,
     val isClipboardOpen: Boolean = false,
+    val isEmojiOpen: Boolean = false,
+    val recentEmojis: List<String> = emptyList(),
     val isToolPanelOpen: Boolean = false,
     val isToolPanelHeightExpanded: Boolean = false,
     val freshClipboardBannerItem: ClipboardEntry? = null,

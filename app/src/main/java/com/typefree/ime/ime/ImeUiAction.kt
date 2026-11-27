@@ -21,6 +21,9 @@ sealed interface ImeUiAction {
     data object DismissSpeakToEdit : ImeUiAction
     data object OpenClipboard : ImeUiAction
     data object CloseClipboard : ImeUiAction
+    data object ToggleEmojiPanel : ImeUiAction
+    data object CloseEmojiPanel : ImeUiAction
+    data class CommitEmoji(val emoji: String) : ImeUiAction
     data object ToggleStylePicker : ImeUiAction
     data object OpenStylePickerFromToolPanel : ImeUiAction
     data object TogglePunctuationStrip : ImeUiAction

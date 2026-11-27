@@ -13,6 +13,8 @@ import com.typefree.ime.ime.engine.KeyInput
 import com.typefree.ime.ime.engine.RimeDataManager
 import com.typefree.ime.ime.engine.RimeInputEngine
 import com.typefree.ime.ime.flypy.FlypyCandidate
+import com.typefree.ime.ime.panels.EmojiCatalog
+import com.typefree.ime.ime.panels.EmojiCategory
 import com.typefree.ime.network.AiPipelineEngine
 import com.typefree.rime.RimeBridge
 import com.typefree.rime.RimeCandidate
@@ -402,5 +404,27 @@ class Flypy14KeyTest {
         assertTrue(text.contains("derive/^[cv](.)$/C$1/"))
         assertTrue(text.contains("derive/^(.)[cv]$/$1C/"))
         assertTrue("double_pinyin_flypy_14.schema.yaml" in RimeDataManager.BUILTIN_ASSET_FILES)
+    }
+
+    @Test
+    fun emojiCatalog_coversMainstreamSocialEmojis_andPrependsRecentsWithoutDuplicates() {
+        assertEquals(6, EmojiCategory.entries.size)
+        for (cat in EmojiCategory.entries) {
+            assertTrue("Category ${cat.name} must not be empty", EmojiCatalog.emojisFor(cat).isNotEmpty())
+        }
+        assertTrue("Expected >= 200 unique mainstream emojis", EmojiCatalog.totalUniqueCount() >= 200)
+
+        val all = EmojiCategory.entries.flatMap { EmojiCatalog.emojisFor(it) }.toSet()
+        for (essential in listOf("😂", "🤣", "😭", "🥹", "🙏", "👍", "❤️", "🔥", "🤡", "🐶", "🍉", "☕")) {
+            assertTrue("Essential emoji $essential must be present", essential in all)
+        }
+
+        val withRecent = EmojiCatalog.emojisFor(
+            category = EmojiCategory.RECENT,
+            recentEmojis = listOf("🍉", "🤡")
+        )
+        assertEquals("🍉", withRecent[0])
+        assertEquals("🤡", withRecent[1])
+        assertEquals("Recents must be deduped", withRecent.size, withRecent.distinct().size)
     }
 }

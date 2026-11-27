@@ -107,57 +107,6 @@ fun GeneralSettingsScreen(
     }
 
     var showResetStatsConfirm by remember { mutableStateOf(false) }
-    var isCheckingUpdate by remember { mutableStateOf(false) }
-    var updateDialogState by remember { mutableStateOf<SharedUpdateDialogState?>(null) }
-    var availableUpdate by remember {
-        mutableStateOf<UpdateCheckInfo?>(
-            AppUpdateChecker.peekCachedUpdate(BuildConfig.VERSION_NAME)
-        )
-    }
-    var dismissedUpdateTag by rememberSaveable { mutableStateOf<String?>(null) }
-
-    // Silently check for updates when opening Settings (strictly skipped under OFFLINE_ONLY egress lock).
-    LaunchedEffect(settings.offlineConfig.mode) {
-        if (settings.offlineConfig.mode == OfflineMode.OFFLINE_ONLY) return@LaunchedEffect
-        val latest = AppUpdateChecker.fetchLatestUpdateSilentlyIfNeeded(
-            currentVersion = BuildConfig.VERSION_NAME,
-            isPrivateDictBuild = BuildConfig.USE_PRIVATE_DICT
-        )
-        if (latest != null && latest.hasUpdate) {
-            availableUpdate = latest
-        }
-    }
-
-    fun triggerUpdateCheck() {
-        if (isCheckingUpdate) return
-        isCheckingUpdate = true
-        coroutineScope.launch {
-            val result = AppUpdateChecker.fetchLatestUpdate(
-                currentVersion = BuildConfig.VERSION_NAME,
-                isPrivateDictBuild = BuildConfig.USE_PRIVATE_DICT
-            )
-            isCheckingUpdate = false
-            result.onSuccess { info ->
-                availableUpdate = info.takeIf { it.hasUpdate }
-                updateDialogState = if (info.hasUpdate) {
-                    SharedUpdateDialogState.UpdateAvailable(info)
-                } else {
-                    SharedUpdateDialogState.UpToDate(info)
-                }
-            }.onFailure { err ->
-                updateDialogState = SharedUpdateDialogState.Error(
-                    err.message ?: AppStrings.pick(
-                        appLang,
-                        "检查更新失败，请稍后重试或前往 GitHub Releases 手动查看",
-                        "Update check failed — please try again later or check GitHub Releases",
-                        "檢查更新失敗，請稍後重試或前往 GitHub Releases 手動查看"
-                    )
-                )
-            }
-        }
-    }
-
-    val bannerUpdate = availableUpdate?.takeIf { it.hasUpdate && it.latestTag != dismissedUpdateTag }
 
     Column(modifier = Modifier.fillMaxSize()) {
         // Pinned Header
@@ -178,57 +127,19 @@ fun GeneralSettingsScreen(
                     fontWeight = FontWeight.ExtraBold
                 )
                 Surface(
-                    onClick = {
-                        val cached = availableUpdate
-                        if (cached != null && cached.hasUpdate) {
-                            updateDialogState = SharedUpdateDialogState.UpdateAvailable(cached)
-                        } else {
-                            triggerUpdateCheck()
-                        }
-                    },
-                    enabled = !isCheckingUpdate,
                     shape = RoundedCornerShape(50),
                     color = MaterialTheme.colorScheme.surfaceVariant,
-                    border = BorderStroke(
-                        1.dp,
-                        if (availableUpdate?.hasUpdate == true) {
-                            TypeFreeEmerald.copy(alpha = 0.60f)
-                        } else {
-                            MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
-                        }
-                    )
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(5.dp)
                     ) {
-                        if (isCheckingUpdate) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(11.dp),
-                                strokeWidth = 1.6.dp,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        } else if (availableUpdate?.hasUpdate == true) {
-                            Box(
-                                modifier = Modifier
-                                    .size(7.dp)
-                                    .clip(CircleShape)
-                                    .background(TypeFreeEmerald)
-                            )
-                        }
                         Text(
-                            text = when {
-                                isCheckingUpdate -> tr("检查更新中…", "Checking…", "檢查更新中…")
-                                availableUpdate?.hasUpdate == true -> tr("有更新 v${availableUpdate!!.latestVersion}", "Update v${availableUpdate!!.latestVersion}", "有更新 v${availableUpdate!!.latestVersion}")
-                                else -> "v${BuildConfig.VERSION_NAME} · BYOK"
-                            },
+                            text = "TypeNeo v${BuildConfig.VERSION_NAME}",
                             style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
-                            color = if (availableUpdate?.hasUpdate == true) {
-                                TypeFreeEmerald
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            }
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -243,19 +154,6 @@ fun GeneralSettingsScreen(
                 .padding(horizontal = 16.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            AnimatedVisibility(visible = bannerUpdate != null) {
-                bannerUpdate?.let { info ->
-                    SettingsUpdatePromptBanner(
-                        info = info,
-                        onUpdateClick = {
-                            updateDialogState = SharedUpdateDialogState.UpdateAvailable(info)
-                        },
-                        onDismiss = {
-                            dismissedUpdateTag = info.latestTag
-                        }
-                    )
-                }
-            }
 
             // 1. 界面语言与外观主题
             Card(
@@ -775,41 +673,6 @@ fun GeneralSettingsScreen(
                         }
                     }
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        FilledTonalButton(
-                            onClick = { triggerUpdateCheck() },
-                            enabled = !isCheckingUpdate,
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
-                        ) {
-                            if (isCheckingUpdate) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(14.dp),
-                                    strokeWidth = 2.dp,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(tr("正在检查…", "Checking…", "正在檢查…"), style = MaterialTheme.typography.labelLarge)
-                            } else {
-                                Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(15.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(tr("检查更新", "Check Updates", "檢查更新"), style = MaterialTheme.typography.labelLarge)
-                            }
-                        }
-
-                        OutlinedButton(
-                            onClick = { openExternalBrowserUrl(context, AppUpdateChecker.GITHUB_RELEASES_PAGE_URL) },
-                            shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
-                        ) {
-                            Text("GitHub Releases", style = MaterialTheme.typography.labelLarge)
-                        }
-                    }
-
                     OutlinedButton(
                         onClick = {
                             repository.updateSettings { it.copy(onboardingCompleted = false) }
@@ -832,7 +695,7 @@ fun GeneralSettingsScreen(
                             modifier = Modifier.size(14.dp)
                         )
                         Text(
-                            text = "TypeFree Android · v${BuildConfig.VERSION_NAME}",
+                            text = "TypeNeo Android · v${BuildConfig.VERSION_NAME}",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -881,14 +744,6 @@ fun GeneralSettingsScreen(
                     Text(tr("取消", "Cancel", "取消"))
                 }
             }
-        )
-    }
-
-    updateDialogState?.let { dialogState ->
-        SharedAppUpdateDialog(
-            state = dialogState,
-            onOpenUrl = { url -> openExternalBrowserUrl(context, url) },
-            onDismiss = { updateDialogState = null }
         )
     }
 }
