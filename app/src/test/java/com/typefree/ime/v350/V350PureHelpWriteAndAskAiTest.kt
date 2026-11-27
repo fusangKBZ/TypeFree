@@ -553,4 +553,130 @@ class V350PureHelpWriteAndAskAiTest {
         val askAiPanel = File(root, "app/src/main/java/com/typefree/ime/ime/panels/AskAiCardPanel.kt")
         assertTrue("AskAiCardPanel.kt must exist", askAiPanel.exists() && askAiPanel.length() > 0)
     }
+
+    @Test
+    fun optionA_resolveQwertyMiddleAiPills_contextAwareAndOverflowSafe() {
+        // 1. Blank/short editor & no selection: middle stays completely empty
+        val idleBlank = TopBarSlotPolicy.resolveQwertyMiddleAiPills(
+            availableWidthDp = 336f,
+            showUndoButton = false,
+            showClipboardButton = true,
+            isIncognito = false,
+            hasPriorityBanner = false,
+            hasActiveSelection = false,
+            wantAskAi = false,
+            wantJevCopilot = true
+        )
+        assertFalse(idleBlank.showAskAi)
+        assertFalse(idleBlank.showRewrite)
+        assertFalse(idleBlank.showJevCopilot)
+
+        // 2. Idle >= 2 chars & no selection: shows [Ask AI] only
+        val idleWithText = TopBarSlotPolicy.resolveQwertyMiddleAiPills(
+            availableWidthDp = 336f,
+            showUndoButton = false,
+            showClipboardButton = true,
+            isIncognito = false,
+            hasPriorityBanner = false,
+            hasActiveSelection = false,
+            wantAskAi = true,
+            wantJevCopilot = true
+        )
+        assertTrue(idleWithText.showAskAi)
+        assertFalse(idleWithText.showRewrite)
+        assertFalse(idleWithText.showJevCopilot)
+
+        // 3. Active selection on 336dp standard phone width: shows [Rewrite] + [Copilot], drops [Ask AI]
+        val selectionStandard = TopBarSlotPolicy.resolveQwertyMiddleAiPills(
+            availableWidthDp = 336f,
+            showUndoButton = false,
+            showClipboardButton = true,
+            isIncognito = false,
+            hasPriorityBanner = false,
+            hasActiveSelection = true,
+            wantAskAi = true,
+            wantJevCopilot = true
+        )
+        assertTrue(selectionStandard.showRewrite)
+        assertTrue(selectionStandard.showJevCopilot)
+        assertFalse(selectionStandard.showAskAi)
+
+        // 4. Active selection on wide 400dp screen: shows all three
+        val selectionWide = TopBarSlotPolicy.resolveQwertyMiddleAiPills(
+            availableWidthDp = 400f,
+            showUndoButton = false,
+            showClipboardButton = true,
+            isIncognito = false,
+            hasPriorityBanner = false,
+            hasActiveSelection = true,
+            wantAskAi = true,
+            wantJevCopilot = true
+        )
+        assertTrue(selectionWide.showRewrite)
+        assertTrue(selectionWide.showJevCopilot)
+        assertTrue(selectionWide.showAskAi)
+
+        // 5. Priority banner active: yields all middle pills
+        val bannerActive = TopBarSlotPolicy.resolveQwertyMiddleAiPills(
+            availableWidthDp = 400f,
+            showUndoButton = false,
+            showClipboardButton = false,
+            isIncognito = false,
+            hasPriorityBanner = true,
+            hasActiveSelection = true,
+            wantAskAi = true,
+            wantJevCopilot = true
+        )
+        assertFalse(bannerActive.showRewrite)
+        assertFalse(bannerActive.showJevCopilot)
+        assertFalse(bannerActive.showAskAi)
+
+        // 6. Narrow 270dp screen with selection: keeps [Rewrite], drops [Copilot] & [Ask AI]
+        val narrowSelection = TopBarSlotPolicy.resolveQwertyMiddleAiPills(
+            availableWidthDp = 270f,
+            showUndoButton = false,
+            showClipboardButton = true,
+            isIncognito = false,
+            hasPriorityBanner = false,
+            hasActiveSelection = true,
+            wantAskAi = true,
+            wantJevCopilot = true
+        )
+        assertTrue(narrowSelection.showRewrite)
+        assertFalse(narrowSelection.showJevCopilot)
+        assertFalse(narrowSelection.showAskAi)
+    }
+
+    @Test
+    fun closingAiSubPanelOrDismissingSpeakToEdit_restoresQwertyTabMode() {
+        val host = FakeImeHost(
+            initialState = ImeUiState(
+                tabMode = KeyboardTabMode.VOICE,
+                voiceSubPanel = VoiceSubPanel.JEV_COPILOT
+            )
+        )
+        val controller = VoiceController(
+            host = host,
+            audioRecorderProvider = { throw UnsupportedOperationException() },
+            onExternalCommitToEngine = {},
+            onResetComposing = {}
+        )
+        try {
+            controller.closeVoiceSubPanel()
+            assertEquals(KeyboardTabMode.QWERTY, host.stateFlow.value.tabMode)
+            assertEquals(VoiceSubPanel.NONE, host.stateFlow.value.voiceSubPanel)
+
+            host.stateFlow.value = host.stateFlow.value.copy(
+                tabMode = KeyboardTabMode.VOICE,
+                voiceSubPanel = VoiceSubPanel.SPEAK_TO_EDIT,
+                rawSelectedText = "selected text"
+            )
+            controller.dismissSpeakToEditForTurn()
+            assertEquals(KeyboardTabMode.QWERTY, host.stateFlow.value.tabMode)
+            assertEquals(VoiceSubPanel.NONE, host.stateFlow.value.voiceSubPanel)
+            assertTrue(host.stateFlow.value.ignoreSelectionForThisTurn)
+        } finally {
+            host.dispose()
+        }
+    }
 }

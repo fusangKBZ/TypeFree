@@ -46,6 +46,7 @@ import com.typefree.ime.ime.candidates.Flypy14PinyinOverhangBar
 import com.typefree.ime.ime.candidates.PredictionCandidateBar
 import com.typefree.ime.ime.chrome.ErrorContextBanner
 import com.typefree.ime.ime.chrome.InlineStyleSelectorStrip
+import com.typefree.ime.ime.chrome.TopBarSlotPolicy
 import com.typefree.ime.ime.chrome.TypeFreeTopBar
 import com.typefree.ime.ime.panels.ArcTranslateFullPanel
 import com.typefree.ime.ime.panels.AskAiCardPanel
@@ -358,7 +359,7 @@ fun KeyboardScreen(
                                     )
                                 }
 
-                                !uiState.isToolPanelOpen && uiState.isPredictionBarVisible -> {
+                                !uiState.isToolPanelOpen && uiState.isPredictionBarVisible && uiState.rawSelectedText.isBlank() -> {
                                     PredictionCandidateBar(
                                         isToolPanelOpen = uiState.isToolPanelOpen,
                                         predictions = uiState.predictionCandidates,
@@ -373,7 +374,9 @@ fun KeyboardScreen(
                                         onAcceptPhraseSuggestion = { onAction(ImeUiAction.AcceptPhraseSuggestion) },
                                         onDismissPhraseSuggestion = { onAction(ImeUiAction.DismissPhraseSuggestion) },
                                         englishSuggestions = uiState.englishSuggestions,
-                                        onSelectEnglishSuggestion = { onAction(ImeUiAction.SelectEnglishSuggestion(it)) }
+                                        onSelectEnglishSuggestion = { onAction(ImeUiAction.SelectEnglishSuggestion(it)) },
+                                        showAskAiPill = TopBarSlotPolicy.shouldShowTopBarAskAiPill(settings, uiState.tabMode, uiState.isFlypyComposing, uiState.isToolPanelOpen, uiState.isClipboardOpen, uiState.currentInputType, uiState.currentEditorText, uiState.currentImeOptions),
+                                        onOpenAskAiCard = { onAction(ImeUiAction.OpenAskAiCard) }
                                     )
                                 }
 

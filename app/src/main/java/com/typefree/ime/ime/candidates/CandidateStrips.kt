@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.sp
 import com.typefree.ime.data.InputScheme
 import com.typefree.ime.ime.ImeLogic
 import com.typefree.ime.ime.LocalKeyboardMetrics
+import com.typefree.ime.ime.chrome.TopBarAskAiPill
 import com.typefree.ime.ime.chrome.TopBarToolPanelButton
 import com.typefree.ime.ime.flypy.FlypyCandidate
 import com.typefree.ime.ui.components.TypeFreeIcons
@@ -75,7 +76,9 @@ fun PredictionCandidateBar(
     onAcceptPhraseSuggestion: (() -> Unit)? = null,
     onDismissPhraseSuggestion: (() -> Unit)? = null,
     englishSuggestions: List<String> = emptyList(),
-    onSelectEnglishSuggestion: ((String) -> Unit)? = null
+    onSelectEnglishSuggestion: ((String) -> Unit)? = null,
+    showAskAiPill: Boolean = false,
+    onOpenAskAiCard: () -> Unit = {}
 ) {
     val palette = LocalTypeFreeKeyboardPalette.current
     val metrics = LocalKeyboardMetrics.current
@@ -258,6 +261,10 @@ fun PredictionCandidateBar(
                     maxLines = 1
                 )
             }
+        }
+
+        if (showAskAiPill) {
+            TopBarAskAiPill(onClick = onOpenAskAiCard)
         }
 
         // 4. Dismiss Predictions (`×`)

@@ -85,6 +85,12 @@ data class QwertyTopBarLayoutPlan(
     val showLeftInlineBanner: Boolean
 )
 
+data class QwertyMiddleAiPillPlan(
+    val showAskAi: Boolean,
+    val showRewrite: Boolean,
+    val showJevCopilot: Boolean
+)
+
 /**
  * Pure policy for TypeFree v3.4.0 Top Bar slot priority & intent convergence:
  * 1. When [hasUndoSnapshot] is true, [TopBarUndoIconButton] is ALWAYS kept visible so a fresh
@@ -240,6 +246,79 @@ object TopBarSlotPolicy {
             showLeftInlineBanner = false
         )
     }
+
+    private const val WIDTH_QWERTY_RIGHT_ICONS_DP = 118f // [😊]34 + 8 + [🌐]34 + 8 + [⌨⌄]34
+    private const val WIDTH_QWERTY_TOOL_ICON_DP = 34f
+    private const val WIDTH_QWERTY_LEFT_ICON_SLOT_DP = 42f // 34 + 8
+    private const val WIDTH_QWERTY_INCOGNITO_SLOT_DP = 58f // ~50 + 8
+    private const val WIDTH_QWERTY_MIDDLE_MARGIN_DP = 12f
+    private const val WIDTH_MIDDLE_AI_PILL_DP = 54f
+    private const val WIDTH_MIDDLE_AI_PILL_GAP_DP = 6f
+
+    /**
+     * Resolves context-aware middle-lane AI capsules for the QWERTY idle top bar:
+     * - Yields immediately to higher-priority transient banners (voice, clipboard, learned/quick toast).
+     * - Without selection: surfaces `[🔍 问AI]` only when [wantAskAi] is true (keeps bar empty otherwise).
+     * - With selection: prioritizes `[✍️ 改写]` + `[✦ 军师]`, plus `[🔍 问AI]` when width permits.
+     */
+    fun resolveQwertyMiddleAiPills(
+        availableWidthDp: Float,
+        showUndoButton: Boolean,
+        showClipboardButton: Boolean,
+        isIncognito: Boolean,
+        hasPriorityBanner: Boolean,
+        hasActiveSelection: Boolean,
+        wantAskAi: Boolean,
+        wantJevCopilot: Boolean
+    ): QwertyMiddleAiPillPlan {
+        if (hasPriorityBanner) {
+            return QwertyMiddleAiPillPlan(
+                showAskAi = false,
+                showRewrite = false,
+                showJevCopilot = false
+            )
+        }
+        val leftFixed = WIDTH_QWERTY_TOOL_ICON_DP +
+            (if (showUndoButton) WIDTH_QWERTY_LEFT_ICON_SLOT_DP else 0f) +
+            (if (showClipboardButton) WIDTH_QWERTY_LEFT_ICON_SLOT_DP else 0f) +
+            (if (isIncognito) WIDTH_QWERTY_INCOGNITO_SLOT_DP else 0f)
+        val middleBudget = availableWidthDp - leftFixed - WIDTH_QWERTY_RIGHT_ICONS_DP - WIDTH_QWERTY_MIDDLE_MARGIN_DP
+
+        if (!hasActiveSelection) {
+            return QwertyMiddleAiPillPlan(
+                showAskAi = wantAskAi && WIDTH_MIDDLE_AI_PILL_DP <= middleBudget,
+                showRewrite = false,
+                showJevCopilot = false
+            )
+        }
+
+        var showRewrite = true
+        var showJev = wantJevCopilot
+        var showAsk = wantAskAi
+
+        fun totalWidth(): Float {
+            val count = (if (showRewrite) 1 else 0) +
+                (if (showJev) 1 else 0) +
+                (if (showAsk) 1 else 0)
+            return if (count == 0) 0f else count * WIDTH_MIDDLE_AI_PILL_DP + (count - 1) * WIDTH_MIDDLE_AI_PILL_GAP_DP
+        }
+
+        if (totalWidth() > middleBudget && showAsk) {
+            showAsk = false
+        }
+        if (totalWidth() > middleBudget && showJev) {
+            showJev = false
+        }
+        if (totalWidth() > middleBudget && showRewrite) {
+            showRewrite = false
+        }
+
+        return QwertyMiddleAiPillPlan(
+            showAskAi = showAsk,
+            showRewrite = showRewrite,
+            showJevCopilot = showJev
+        )
+    }
 }
 
 @Composable
@@ -379,6 +458,22 @@ fun TypeFreeTopBar(
             qwertyPlan?.showClipboardIconButton ?: slotState.showClipboardButton
         }
         val allowInlineBanner = if (isQwertyRightCluster) true else (qwertyPlan?.showLeftInlineBanner ?: true)
+        val hasActiveSelection = uiState.rawSelectedText.isNotBlank()
+        val isPasswordInput = ImeLogic.isPasswordEditorInputType(uiState.currentInputType)
+        val middleAiPlan = if (isQwertyRightCluster) {
+            TopBarSlotPolicy.resolveQwertyMiddleAiPills(
+                availableWidthDp = maxWidth.value,
+                showUndoButton = slotState.showUndoButton,
+                showClipboardButton = showClipboardBtn,
+                isIncognito = uiState.isIncognitoMode,
+                hasPriorityBanner = hasPriorityBanner,
+                hasActiveSelection = hasActiveSelection,
+                wantAskAi = wantAskAi,
+                wantJevCopilot = settings.jevCopilotEnabled && !isPasswordInput
+            )
+        } else {
+            null
+        }
 
         Row(
             modifier = Modifier
@@ -697,6 +792,29 @@ fun TypeFreeTopBar(
                         maxLines = 1
                     )
                 }
+            } else if (
+                isQwertyRightCluster &&
+                middleAiPlan != null &&
+                (middleAiPlan.showRewrite || middleAiPlan.showJevCopilot || middleAiPlan.showAskAi)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    if (middleAiPlan.showRewrite) {
+                        TopBarVoicePenPill(
+                            label = slotState.voicePenLabel,
+                            isHighlighted = true,
+                            onClick = onOpenHelpMeWrite
+                        )
+                    }
+                    if (middleAiPlan.showJevCopilot) {
+                        TopBarJevCopilotPill(onClick = onOpenJevCopilot)
+                    }
+                    if (middleAiPlan.showAskAi) {
+                        TopBarAskAiPill(onClick = onOpenAskAiCard)
+                    }
+                }
             }
         }
 
@@ -800,7 +918,7 @@ private fun TopBarVoicePenPill(
                 shape = RoundedCornerShape(14.dp)
             )
             .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp),
+            .padding(horizontal = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp)
     ) {
@@ -839,7 +957,7 @@ fun TopBarAskAiPill(
                 shape = RoundedCornerShape(14.dp)
             )
             .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp),
+            .padding(horizontal = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp)
     ) {
@@ -875,7 +993,7 @@ private fun TopBarJevCopilotPill(
                 shape = RoundedCornerShape(14.dp)
             )
             .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp),
+            .padding(horizontal = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp)
     ) {

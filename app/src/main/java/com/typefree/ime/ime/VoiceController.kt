@@ -1263,6 +1263,7 @@ class VoiceController(
         }
         host.stateFlow.update {
             it.copy(
+                tabMode = KeyboardTabMode.QWERTY,
                 voiceSubPanel = VoiceSubPanel.NONE,
                 activeIntentMode = VoiceIntentMode.DICTATE,
                 capturedChatContext = CapturedChatContext(),
@@ -1292,6 +1293,7 @@ class VoiceController(
         }
         host.stateFlow.update {
             it.copy(
+                tabMode = KeyboardTabMode.QWERTY,
                 ignoreSelectionForThisTurn = true,
                 voiceSubPanel = VoiceSubPanel.NONE,
                 activeIntentMode = VoiceIntentMode.DICTATE
