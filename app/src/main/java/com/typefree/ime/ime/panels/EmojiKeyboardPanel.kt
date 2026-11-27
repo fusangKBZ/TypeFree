@@ -37,7 +37,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.typefree.ime.i18n.tr
@@ -52,28 +51,19 @@ import kotlinx.coroutines.launch
 enum class EmojiCategory(
     val labelZh: String,
     val labelEn: String,
-    val badgeIcon: String,
-    val isPlatformShortcode: Boolean = false
+    val badgeIcon: String
 ) {
     RECENT("常用", "Recent", "🕒"),
-    ZHIHU("知乎", "Zhihu", "🐶", isPlatformShortcode = true),
-    BAIDU("百度", "Baidu", "😏", isPlatformShortcode = true),
-    WECHAT("微信", "WeChat", "🐕", isPlatformShortcode = true),
     SMILEYS("表情", "Smileys", "😀"),
     GESTURES("手势", "People", "👍"),
     SYMBOLS("符号", "Symbols", "❤️"),
-    ANIMALS("自然", "Nature", "🐾"),
+    ANIMALS("自然", "Nature", "🐶"),
     FOOD("生活", "Daily", "🍉")
 }
 
-data class PlatformSticker(
-    val iconHint: String,
-    val code: String
-)
-
 /**
- * Curated Unicode emoji + Chinese community shortcode sticker catalog
- * (WeChat, Zhihu `[狗头]`, Baidu Tieba `#(滑稽)`, Weibo, Xiaohongshu): 500+ total unique entries across 9 categories.
+ * Curated universal Unicode emoji catalog tailored for everyday messaging and social apps:
+ * ~480 unique standard Unicode emojis across 6 categories.
  */
 object EmojiCatalog {
 
@@ -84,123 +74,6 @@ object EmojiCatalog {
         "🤝", "👌", "✌️", "🫶", "❤️", "💔", "🔥", "✨",
         "🎉", "💯", "👀", "💀", "🤡", "🐶", "🐱", "🌹",
         "🍉", "☕", "🍺", "🚀", "💡", "✅", "❌", "⚡"
-    )
-
-    val zhihuStickers: List<PlatformSticker> = listOf(
-        PlatformSticker("🐶", "[狗头]"),
-        PlatformSticker("😲", "[惊喜]"),
-        PlatformSticker("👍", "[赞同]"),
-        PlatformSticker("🤦", "[捂脸]"),
-        PlatformSticker("😂", "[飙泪笑]"),
-        PlatformSticker("🤔", "[思考]"),
-        PlatformSticker("😜", "[调皮]"),
-        PlatformSticker("🧐", "[机智]"),
-        PlatformSticker("👀", "[好奇]"),
-        PlatformSticker("😅", "[尴尬]"),
-        PlatformSticker("🍉", "[吃瓜]"),
-        PlatformSticker("😄", "[大笑]"),
-        PlatformSticker("🤣", "[笑哭]"),
-        PlatformSticker("🥺", "[可怜]"),
-        PlatformSticker("🙄", "[白眼]"),
-        PlatformSticker("😎", "[酷]"),
-        PlatformSticker("😳", "[发呆]"),
-        PlatformSticker("😒", "[撇嘴]"),
-        PlatformSticker("😊", "[害羞]"),
-        PlatformSticker("🙏", "[拜托]"),
-        PlatformSticker("🤝", "[握手]"),
-        PlatformSticker("👏", "[鼓掌]"),
-        PlatformSticker("👌", "[赞]"),
-        PlatformSticker("🍻", "[干杯]"),
-        PlatformSticker("🌹", "[玫瑰]"),
-        PlatformSticker("🎈", "[气球]"),
-        PlatformSticker("🔥", "[厉害]"),
-        PlatformSticker("📣", "[打CALL]"),
-        PlatformSticker("😱", "[惊讶]"),
-        PlatformSticker("🤭", "[偷笑]"),
-        PlatformSticker("😠", "[生气]"),
-        PlatformSticker("💔", "[心碎]"),
-        PlatformSticker("❤️", "[爱你]"),
-        PlatformSticker("🫂", "[抱抱]"),
-        PlatformSticker("🙂", "[微笑]"),
-        PlatformSticker("😢", "[流泪]")
-    )
-
-    val baiduStickers: List<PlatformSticker> = listOf(
-        PlatformSticker("😏", "#(滑稽)"),
-        PlatformSticker("😈", "#(阴险)"),
-        PlatformSticker("😊", "#(笑眼)"),
-        PlatformSticker("😜", "#(吐舌)"),
-        PlatformSticker("🥺", "#(委屈)"),
-        PlatformSticker("😇", "#(乖)"),
-        PlatformSticker("😆", "#(太开心)"),
-        PlatformSticker("😤", "#(喷)"),
-        PlatformSticker("👍", "#(真棒)"),
-        PlatformSticker("😒", "#(鄙视)"),
-        PlatformSticker("😡", "#(怒)"),
-        PlatformSticker("😓", "#(汗)"),
-        PlatformSticker("😭", "#(泪)"),
-        PlatformSticker("😫", "#(惊哭)"),
-        PlatformSticker("😲", "#(惊讶)"),
-        PlatformSticker("😎", "#(酷)"),
-        PlatformSticker("😰", "#(狂汗)"),
-        PlatformSticker("🙁", "#(不高兴)"),
-        PlatformSticker("😑", "#(黑线)"),
-        PlatformSticker("😅", "#(勉强)"),
-        PlatformSticker("😴", "#(睡觉)"),
-        PlatformSticker("🤭", "#(捂嘴笑)"),
-        PlatformSticker("😉", "#(你懂的)"),
-        PlatformSticker("😮", "#(啊)"),
-        PlatformSticker("🤑", "#(钱)"),
-        PlatformSticker("🌹", "#(玫瑰)"),
-        PlatformSticker("🍵", "#(茶杯)"),
-        PlatformSticker("🎂", "#(蛋糕)"),
-        PlatformSticker("👌", "#(ok)"),
-        PlatformSticker("✌️", "#(胜利)"),
-        PlatformSticker("❤️", "#(爱心)"),
-        PlatformSticker("💔", "#(心碎)"),
-        PlatformSticker("😂", "#(哈哈)"),
-        PlatformSticker("😍", "#(花心)"),
-        PlatformSticker("🤩", "#(酸爽)"),
-        PlatformSticker("🤔", "#(疑问)")
-    )
-
-    val wechatStickers: List<PlatformSticker> = listOf(
-        PlatformSticker("🐕", "[旺柴]"),
-        PlatformSticker("🤯", "[裂开]"),
-        PlatformSticker("🤦", "[捂脸]"),
-        PlatformSticker("🥹", "[破涕为笑]"),
-        PlatformSticker("🥲", "[苦涩]"),
-        PlatformSticker("😮‍💨", "[叹气]"),
-        PlatformSticker("🧐", "[机智]"),
-        PlatformSticker("😏", "[奸笑]"),
-        PlatformSticker("🤝", "[社会社会]"),
-        PlatformSticker("👀", "[让我看看]"),
-        PlatformSticker("🍉", "[吃瓜]"),
-        PlatformSticker("🔥", "[666]"),
-        PlatformSticker("😳", "[发呆]"),
-        PlatformSticker("😎", "[得意]"),
-        PlatformSticker("🤭", "[偷笑]"),
-        PlatformSticker("😈", "[坏笑]"),
-        PlatformSticker("🤥", "[抠鼻]"),
-        PlatformSticker("👏", "[鼓掌]"),
-        PlatformSticker("🙄", "[白眼]"),
-        PlatformSticker("😓", "[流汗]"),
-        PlatformSticker("😄", "[憨笑]"),
-        PlatformSticker("🤔", "[疑问]"),
-        PlatformSticker("🔨", "[敲打]"),
-        PlatformSticker("👋", "[再见]"),
-        PlatformSticker("🙏", "[抱拳]"),
-        PlatformSticker("🫂", "[拥抱]"),
-        PlatformSticker("👌", "[好的]"),
-        PlatformSticker("💪", "[加油]"),
-        PlatformSticker("🎆", "[烟花]"),
-        PlatformSticker("🧧", "[红包]"),
-        PlatformSticker("🤨", "[皱眉]"),
-        PlatformSticker("☕", "[悠闲]"),
-        PlatformSticker("😵", "[晕]"),
-        PlatformSticker("🫠", "[衰]"),
-        PlatformSticker("😱", "[惊恐]"),
-        PlatformSticker("😊", "[害羞]")
     )
 
     val smileys: List<String> = listOf(
@@ -218,7 +91,7 @@ object EmojiCatalog {
         "😣", "😞", "😓", "😩", "😫", "🥱", "😤", "😡",
         "😠", "🤬", "😈", "👿", "💀", "☠️", "💩", "🤡",
         "👹", "👺", "👻", "👽", "👾", "🤖", "😺", "😸",
-        "😹", "😻", "😼", "😽", "🙀", "😿", "😾", "🫶"
+        "😹", "😻", "😼", "😽", "🙀", "😿", "😾", "🫨"
     )
 
     val gestures: List<String> = listOf(
@@ -229,7 +102,8 @@ object EmojiCatalog {
         "🦵", "🦶", "✍️", "🫵", "👀", "👁️", "👅", "👄",
         "🫦", "🧠", "🫀", "🫁", "🗣️", "👤", "👥", "🫂",
         "🤦", "🤷", "🙅", "🙆", "🙋", "💁", "🙇", "🫡",
-        "💃", "🕺", "🏃", "🚶", "🧘", "🛌", "👨‍💻", "👩‍💻"
+        "💃", "🕺", "🏃", "🚶", "🧘", "🛌", "👨‍💻", "👩‍💻",
+        "🧑‍💻", "👩‍🎓", "👨‍🎓", "🧑‍🏫", "👩‍🚀", "👨‍🚀", "🥷", "🦸"
     )
 
     val symbols: List<String> = listOf(
@@ -241,7 +115,9 @@ object EmojiCatalog {
         "🎆", "🎇", "🧨", "🧧", "💯", "📌", "📍", "✅",
         "❌", "⭕", "⛔", "🚫", "⚠️", "❓", "❔", "❗",
         "❕", "⚡", "♻️", "🔔", "🔕", "🔇", "🔊", "🔒",
-        "🔓", "🔑", "🛡️", "⚖️", "♻️", "➡️", "⬅️", "⬆️"
+        "🔓", "🔑", "🛡️", "⚖️", "⬇️", "➡️", "⬅️", "⬆️",
+        "🔴", "🟠", "🟡", "🟢", "🔵", "🟣", "⚫", "⚪",
+        "🆘", "🆕", "🆓", "🆗", "🆙", "🆒", "➕", "➖"
     )
 
     val animalsAndNature: List<String> = listOf(
@@ -257,7 +133,7 @@ object EmojiCatalog {
         "🌹", "🥀", "🌺", "🌸", "🌼", "🌻", "🌷", "🪷",
         "🍀", "🌿", "🌱", "🌲", "🌳", "🌴", "🌵", "🌾",
         "☀️", "🌤️", "⛅", "🌦️", "🌧️", "⛈️", "🌩️", "🌨️",
-        "🌈", "❄️", "☃️", "💨", "🌊", "🌙", "🌛", "🌟"
+        "🌈", "❄️", "☃️", "🔥", "🌊", "🌙", "🌛", "☀️"
     )
 
     val foodAndDaily: List<String> = listOf(
@@ -272,22 +148,14 @@ object EmojiCatalog {
         "🍺", "🍻", "🥂", "🍷", "🥃", "🍸", "🍹", "🥤",
         "🎁", "🎈", "🎀", "🏆", "🥇", "🥈", "🥉", "🎯",
         "🎮", "🕹️", "🎲", "🎵", "🎶", "🎧", "📸", "🎬",
-        "💻", "📱", "⌨️", "🖥️", "🚗", "🚕", "✈️", "🚀"
+        "💻", "📱", "⌨️", "🖥️", "🚗", "🚕", "✈️", "🚀",
+        "💡", "📝", "📚", "📅", "⏰", "💰", "💎", "🛒",
+        "🏠", "🏢", "🏥", "🏫", "🚲", "🛵", "🚄", "⛵"
     )
-
-    fun stickersFor(category: EmojiCategory): List<PlatformSticker> = when (category) {
-        EmojiCategory.ZHIHU -> zhihuStickers
-        EmojiCategory.BAIDU -> baiduStickers
-        EmojiCategory.WECHAT -> wechatStickers
-        else -> emptyList()
-    }
 
     fun emojisFor(category: EmojiCategory, recentEmojis: List<String> = emptyList()): List<String> {
         return when (category) {
             EmojiCategory.RECENT -> (recentEmojis + defaultHotEmojis).distinct()
-            EmojiCategory.ZHIHU -> zhihuStickers.map { it.code }
-            EmojiCategory.BAIDU -> baiduStickers.map { it.code }
-            EmojiCategory.WECHAT -> wechatStickers.map { it.code }
             EmojiCategory.SMILEYS -> smileys
             EmojiCategory.GESTURES -> gestures
             EmojiCategory.SYMBOLS -> symbols
@@ -296,18 +164,8 @@ object EmojiCatalog {
         }
     }
 
-    fun isShortcode(value: String): Boolean {
-        val trimmed = value.trim()
-        return (trimmed.startsWith("[") && trimmed.endsWith("]") && trimmed.length >= 3) ||
-            (trimmed.startsWith("#(") && trimmed.endsWith(")") && trimmed.length >= 4)
-    }
-
     fun totalUniqueCount(): Int =
-        (defaultHotEmojis +
-            zhihuStickers.map { it.code } +
-            baiduStickers.map { it.code } +
-            wechatStickers.map { it.code } +
-            smileys + gestures + symbols + animalsAndNature + foodAndDaily)
+        (defaultHotEmojis + smileys + gestures + symbols + animalsAndNature + foodAndDaily)
             .toSet()
             .size
 }
@@ -357,21 +215,6 @@ fun EmojiKeyboardPanel(
                     color = palette.keyTextMuted,
                     fontSize = 11.5.sp
                 )
-                val platformHint = when (activeCategory) {
-                    EmojiCategory.ZHIHU -> tr("发送后显示知乎原图", "Renders on Zhihu", "發送後顯示知乎原圖")
-                    EmojiCategory.BAIDU -> tr("发送后显示贴吧原图", "Renders on Baidu Tieba", "發送後顯示貼吧原圖")
-                    EmojiCategory.WECHAT -> tr("发送后显示微信原图", "Renders on WeChat", "發送後顯示微信原圖")
-                    else -> ""
-                }
-                if (platformHint.isNotEmpty()) {
-                    Text(
-                        text = platformHint,
-                        color = palette.keyTextMuted.copy(alpha = 0.78f),
-                        fontSize = 10.5.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
             }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -413,90 +256,28 @@ fun EmojiKeyboardPanel(
             }
         }
 
-        // 2. Emoji / Platform Sticker Grid
-        if (activeCategory.isPlatformShortcode) {
-            val stickers = remember(activeCategory) { EmojiCatalog.stickersFor(activeCategory) }
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(3),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentPadding = PaddingValues(vertical = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(5.dp),
-                verticalArrangement = Arrangement.spacedBy(5.dp)
-            ) {
-                items(stickers, key = { "${activeCategory.name}_${it.code}" }) { sticker ->
-                    Row(
-                        modifier = Modifier
-                            .height(38.dp)
-                            .clip(RoundedCornerShape(9.dp))
-                            .background(palette.keyCapBg)
-                            .border(1.dp, palette.keyBorder, RoundedCornerShape(9.dp))
-                            .clickable { onSelectEmoji(sticker.code) }
-                            .padding(horizontal = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp)
-                    ) {
-                        Text(
-                            text = sticker.iconHint,
-                            fontSize = 16.sp
-                        )
-                        Text(
-                            text = sticker.code,
-                            color = palette.keyTextPrimary,
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-            }
-        } else {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(8),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentPadding = PaddingValues(vertical = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                items(emojis, key = { "${activeCategory.name}_$it" }) { emoji ->
-                    val isCode = EmojiCatalog.isShortcode(emoji)
-                    Box(
-                        modifier = Modifier
-                            .height(40.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .then(
-                                if (isCode) {
-                                    Modifier
-                                        .background(palette.keyCapBg)
-                                        .border(1.dp, palette.keyBorder, RoundedCornerShape(8.dp))
-                                        .padding(horizontal = 2.dp)
-                                } else {
-                                    Modifier
-                                }
-                            )
-                            .clickable { onSelectEmoji(emoji) },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (isCode) {
-                            Text(
-                                text = emoji,
-                                color = palette.keyTextPrimary,
-                                fontSize = 9.5.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        } else {
-                            Text(
-                                text = emoji,
-                                fontSize = 23.sp
-                            )
-                        }
-                    }
+        // 2. 8-column Emoji Grid
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(8),
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            contentPadding = PaddingValues(vertical = 2.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            items(emojis, key = { "${activeCategory.name}_$it" }) { emoji ->
+                Box(
+                    modifier = Modifier
+                        .height(40.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { onSelectEmoji(emoji) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = emoji,
+                        fontSize = 23.sp
+                    )
                 }
             }
         }
