@@ -47,10 +47,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.typefree.ime.data.InputScheme
+import com.typefree.ime.i18n.tr
 import com.typefree.ime.ime.ImeLogic
 import com.typefree.ime.ime.LocalKeyboardMetrics
 import com.typefree.ime.ime.chrome.TopBarAskAiPill
 import com.typefree.ime.ime.chrome.TopBarToolPanelButton
+import com.typefree.ime.ime.chrome.TopBarVoicePenPill
 import com.typefree.ime.ime.flypy.FlypyCandidate
 import com.typefree.ime.ui.components.TypeFreeIcons
 import com.typefree.ime.ui.theme.LocalTypeFreeKeyboardPalette
@@ -79,7 +81,9 @@ fun PredictionCandidateBar(
     onSelectEnglishSuggestion: ((String) -> Unit)? = null,
     showAskAiPill: Boolean = false,
     isAskAiFollowUp: Boolean = false,
-    onOpenAskAiCard: () -> Unit = {}
+    onOpenAskAiCard: () -> Unit = {},
+    showHelpWritePill: Boolean = false,
+    onOpenHelpMeWrite: () -> Unit = {}
 ) {
     val palette = LocalTypeFreeKeyboardPalette.current
     val metrics = LocalKeyboardMetrics.current
@@ -266,6 +270,13 @@ fun PredictionCandidateBar(
 
         if (showAskAiPill) {
             TopBarAskAiPill(onClick = onOpenAskAiCard, isFollowUp = isAskAiFollowUp)
+        }
+        if (showHelpWritePill) {
+            TopBarVoicePenPill(
+                label = tr("帮写", "Write", "幫寫"),
+                isHighlighted = false,
+                onClick = onOpenHelpMeWrite
+            )
         }
 
         // 4. Dismiss Predictions (`×`)

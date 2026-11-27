@@ -291,6 +291,11 @@ object ImeLogic {
 
     val quickEditChips: List<QuickEditChip> = listOf(
         QuickEditChip(
+            id = "generate_reply",
+            label = "💬 生成回复",
+            instruction = "请将<selected_text>中的内容视为对方发来的消息、提问或需要回应的内容，结合当前沟通场景与语气风格，直接生成一条自然得体、逻辑合理、可直接发送的回复正文（只输出回复正文，不要复述对方原话，不要任何解释、引号或前缀）"
+        ),
+        QuickEditChip(
             id = "smart_polish",
             label = "✨ 智能润色",
             instruction = "保持原意，清理口语赘余与语病，优化表达流畅度与标点排版"

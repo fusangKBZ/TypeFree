@@ -170,7 +170,11 @@ class VoiceController(
         onResetComposing()
         val stateSnap = host.stateFlow.value
         val isPassword = ImeLogic.isPasswordEditorInputType(stateSnap.currentInputType)
-        val editorDraft = if (isPassword) "" else host.readFullEditorTextSafely().trim()
+        val editorDraft = if (isPassword) {
+            ""
+        } else {
+            host.readFullEditorTextSafely().trim().ifBlank { stateSnap.currentEditorText.trim() }
+        }
         val isSocialPkg = com.typefree.ime.ime.panels.HelpWriteChipFilter.isSocialContentPackage(stateSnap.targetPackage)
         val defaultPreset = if (isSocialPkg && editorDraft.isBlank()) {
             com.typefree.ime.ime.panels.HelpWriteChipFilter.creativeGenres.firstOrNull { it.id == "genre_seed_note" }
@@ -1238,12 +1242,25 @@ class VoiceController(
     }
 
     fun toggleHelpWritePreset(preset: HelpWritePromptPreset) {
-        val currPhase = host.stateFlow.value.voicePhase
+        val curr = host.stateFlow.value
+        val currPhase = curr.voicePhase
         if (currPhase is VoicePhase.Recording || currPhase is VoicePhase.Processing) return
+        if (preset.id == "transform_generate_reply") {
+            val isPassword = ImeLogic.isPasswordEditorInputType(curr.currentInputType)
+            val liveDraft = if (isPassword) {
+                ""
+            } else {
+                host.readFullEditorTextSafely().trim().ifBlank { curr.currentEditorText.trim() }
+            }
+            if (liveDraft.isNotBlank()) {
+                runHelpWriteDraftTransform(preset)
+                return
+            }
+        }
         host.performKeyFeedback(strong = false)
-        host.stateFlow.update { curr ->
-            val nextSelected = if (curr.selectedHelpWritePreset?.id == preset.id) null else preset
-            curr.copy(selectedHelpWritePreset = nextSelected)
+        host.stateFlow.update { state ->
+            val nextSelected = if (state.selectedHelpWritePreset?.id == preset.id) null else preset
+            state.copy(selectedHelpWritePreset = nextSelected)
         }
     }
 

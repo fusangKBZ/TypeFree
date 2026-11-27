@@ -1914,6 +1914,19 @@ class TypeFreeInputMethodService : ComposeInputMethodService(), ImeHostCallbacks
         syncCurrentEditorText()
     }
 
+    private fun readSurroundingCombinedSafe(ic: InputConnection, windowChars: Int): String {
+        val before = runCatching { ic.getTextBeforeCursor(windowChars, 0)?.toString().orEmpty() }.getOrDefault("")
+        val sel = runCatching { ic.getSelectedText(0)?.toString().orEmpty() }.getOrDefault("")
+        val after = runCatching { ic.getTextAfterCursor(windowChars, 0)?.toString().orEmpty() }.getOrDefault("")
+        return before + sel + after
+    }
+
+    private fun readExtractedTextSafe(ic: InputConnection): String {
+        return runCatching {
+            ic.getExtractedText(ExtractedTextRequest(), 0)?.text?.toString().orEmpty()
+        }.getOrDefault("")
+    }
+
     private fun syncCurrentEditorText() {
         lastEditorTextSyncMs = System.currentTimeMillis()
         val stateSnap = _imeState.value
@@ -1924,14 +1937,8 @@ class TypeFreeInputMethodService : ComposeInputMethodService(), ImeHostCallbacks
             return
         }
         val ic = currentInputConnection ?: return
-        val text = try {
-            val before = ic.getTextBeforeCursor(1000, 0)?.toString().orEmpty()
-            val sel = ic.getSelectedText(0)?.toString().orEmpty()
-            val after = ic.getTextAfterCursor(1000, 0)?.toString().orEmpty()
-            (before + sel + after).trim()
-        } catch (_: Exception) {
-            ""
-        }
+        val surrounding = readSurroundingCombinedSafe(ic, 1000).trim()
+        val text = surrounding.ifBlank { readExtractedTextSafe(ic).trim() }
         if (text != stateSnap.currentEditorText) {
             _imeState.update { it.copy(currentEditorText = text) }
         }
@@ -1955,18 +1962,13 @@ class TypeFreeInputMethodService : ComposeInputMethodService(), ImeHostCallbacks
 
     override fun readFullEditorTextSafely(): String {
         val ic = currentInputConnection ?: return ""
-        return try {
-            val extracted = ic.getExtractedText(ExtractedTextRequest(), 0)?.text?.toString()
-            if (!extracted.isNullOrEmpty()) {
-                extracted
-            } else {
-                val before = ic.getTextBeforeCursor(2000, 0)?.toString().orEmpty()
-                val selected = ic.getSelectedText(0)?.toString().orEmpty()
-                val after = ic.getTextAfterCursor(2000, 0)?.toString().orEmpty()
-                before + selected + after
-            }
-        } catch (_: Exception) {
-            ""
+        val extracted = readExtractedTextSafe(ic)
+        val surrounding = readSurroundingCombinedSafe(ic, 2000)
+        return when {
+            extracted.isNotBlank() && surrounding.isNotBlank() ->
+                if (extracted.length >= surrounding.length) extracted else surrounding
+            extracted.isNotBlank() -> extracted
+            else -> surrounding
         }
     }
 

@@ -88,7 +88,8 @@ data class QwertyTopBarLayoutPlan(
 data class QwertyMiddleAiPillPlan(
     val showAskAi: Boolean,
     val showRewrite: Boolean,
-    val showJevCopilot: Boolean
+    val showJevCopilot: Boolean,
+    val showHelpWrite: Boolean = false
 )
 
 /**
@@ -152,17 +153,15 @@ object TopBarSlotPolicy {
     private const val WIDTH_VOICE_CAPSULE_DP = 64f
     private const val WIDTH_RIGHT_PILL_SLOT_DP = 60f // ~55dp pill + 5dp gap
 
-    fun shouldShowTopBarAskAiPill(
-        settings: AppSettings,
+    private fun isContextEligibleForMiddlePill(
         activeTab: KeyboardTabMode,
         isComposing: Boolean,
         isToolPanelOpen: Boolean,
         isClipboardOpen: Boolean,
         currentInputType: Int,
         currentEditorText: String,
-        currentImeOptions: Int = 0
+        currentImeOptions: Int
     ): Boolean {
-        if (!settings.equalEqualAskAiEnabled) return false
         if (activeTab != KeyboardTabMode.QWERTY || isComposing || isToolPanelOpen || isClipboardOpen) return false
         if (ImeLogic.isPasswordEditorInputType(currentInputType)) return false
         val imeAction = currentImeOptions and EditorInfo.IME_MASK_ACTION
@@ -177,6 +176,48 @@ object TopBarSlotPolicy {
             return false
         }
         return currentEditorText.trim().length >= 2
+    }
+
+    fun shouldShowTopBarAskAiPill(
+        settings: AppSettings,
+        activeTab: KeyboardTabMode,
+        isComposing: Boolean,
+        isToolPanelOpen: Boolean,
+        isClipboardOpen: Boolean,
+        currentInputType: Int,
+        currentEditorText: String,
+        currentImeOptions: Int = 0
+    ): Boolean {
+        if (!settings.equalEqualAskAiEnabled) return false
+        return isContextEligibleForMiddlePill(
+            activeTab = activeTab,
+            isComposing = isComposing,
+            isToolPanelOpen = isToolPanelOpen,
+            isClipboardOpen = isClipboardOpen,
+            currentInputType = currentInputType,
+            currentEditorText = currentEditorText,
+            currentImeOptions = currentImeOptions
+        )
+    }
+
+    fun shouldShowTopBarHelpWritePill(
+        activeTab: KeyboardTabMode,
+        isComposing: Boolean,
+        isToolPanelOpen: Boolean,
+        isClipboardOpen: Boolean,
+        currentInputType: Int,
+        currentEditorText: String,
+        currentImeOptions: Int = 0
+    ): Boolean {
+        return isContextEligibleForMiddlePill(
+            activeTab = activeTab,
+            isComposing = isComposing,
+            isToolPanelOpen = isToolPanelOpen,
+            isClipboardOpen = isClipboardOpen,
+            currentInputType = currentInputType,
+            currentEditorText = currentEditorText,
+            currentImeOptions = currentImeOptions
+        )
     }
 
     /**
@@ -269,13 +310,15 @@ object TopBarSlotPolicy {
         hasPriorityBanner: Boolean,
         hasActiveSelection: Boolean,
         wantAskAi: Boolean,
-        wantJevCopilot: Boolean
+        wantJevCopilot: Boolean,
+        wantHelpWrite: Boolean = false
     ): QwertyMiddleAiPillPlan {
         if (hasPriorityBanner) {
             return QwertyMiddleAiPillPlan(
                 showAskAi = false,
                 showRewrite = false,
-                showJevCopilot = false
+                showJevCopilot = false,
+                showHelpWrite = false
             )
         }
         val leftFixed = WIDTH_QWERTY_TOOL_ICON_DP +
@@ -285,10 +328,26 @@ object TopBarSlotPolicy {
         val middleBudget = availableWidthDp - leftFixed - WIDTH_QWERTY_RIGHT_ICONS_DP - WIDTH_QWERTY_MIDDLE_MARGIN_DP
 
         if (!hasActiveSelection) {
+            var showAsk = wantAskAi
+            var showHelp = wantHelpWrite
+            fun idleWidth(): Float {
+                val count = (if (showAsk) 1 else 0) + (if (showHelp) 1 else 0)
+                return if (count == 0) 0f else count * WIDTH_MIDDLE_AI_PILL_DP + (count - 1) * WIDTH_MIDDLE_AI_PILL_GAP_DP
+            }
+            if (idleWidth() > middleBudget && showHelp && showAsk) {
+                showHelp = false
+            }
+            if (idleWidth() > middleBudget && showHelp) {
+                showHelp = false
+            }
+            if (idleWidth() > middleBudget && showAsk) {
+                showAsk = false
+            }
             return QwertyMiddleAiPillPlan(
-                showAskAi = wantAskAi && WIDTH_MIDDLE_AI_PILL_DP <= middleBudget,
+                showAskAi = showAsk,
                 showRewrite = false,
-                showJevCopilot = false
+                showJevCopilot = false,
+                showHelpWrite = showHelp
             )
         }
 
@@ -316,7 +375,8 @@ object TopBarSlotPolicy {
         return QwertyMiddleAiPillPlan(
             showAskAi = showAsk,
             showRewrite = showRewrite,
-            showJevCopilot = showJev
+            showJevCopilot = showJev,
+            showHelpWrite = false
         )
     }
 }
@@ -431,6 +491,19 @@ fun TypeFreeTopBar(
     } else {
         false
     }
+    val wantHelpWrite = if (isQwertyRightCluster) {
+        TopBarSlotPolicy.shouldShowTopBarHelpWritePill(
+            activeTab = uiState.tabMode,
+            isComposing = uiState.isFlypyComposing,
+            isToolPanelOpen = uiState.isToolPanelOpen,
+            isClipboardOpen = uiState.isClipboardOpen,
+            currentInputType = uiState.currentInputType,
+            currentEditorText = uiState.currentEditorText,
+            currentImeOptions = uiState.currentImeOptions
+        )
+    } else {
+        false
+    }
 
     BoxWithConstraints(
         modifier = Modifier
@@ -469,7 +542,8 @@ fun TypeFreeTopBar(
                 hasPriorityBanner = hasPriorityBanner,
                 hasActiveSelection = hasActiveSelection,
                 wantAskAi = wantAskAi,
-                wantJevCopilot = settings.jevCopilotEnabled && !isPasswordInput
+                wantJevCopilot = settings.jevCopilotEnabled && !isPasswordInput,
+                wantHelpWrite = wantHelpWrite
             )
         } else {
             null
@@ -795,7 +869,7 @@ fun TypeFreeTopBar(
             } else if (
                 isQwertyRightCluster &&
                 middleAiPlan != null &&
-                (middleAiPlan.showRewrite || middleAiPlan.showJevCopilot || middleAiPlan.showAskAi)
+                (middleAiPlan.showRewrite || middleAiPlan.showJevCopilot || middleAiPlan.showAskAi || middleAiPlan.showHelpWrite)
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -815,6 +889,13 @@ fun TypeFreeTopBar(
                         TopBarAskAiPill(
                             onClick = onOpenAskAiCard,
                             isFollowUp = uiState.askAiFollowUpArmed && uiState.askAiHistory.isNotEmpty()
+                        )
+                    }
+                    if (middleAiPlan.showHelpWrite) {
+                        TopBarVoicePenPill(
+                            label = slotState.voicePenLabel,
+                            isHighlighted = false,
+                            onClick = onOpenHelpMeWrite
                         )
                     }
                 }
@@ -904,7 +985,7 @@ fun TypeFreeTopBar(
 }
 
 @Composable
-private fun TopBarVoicePenPill(
+fun TopBarVoicePenPill(
     label: String,
     isHighlighted: Boolean,
     onClick: () -> Unit

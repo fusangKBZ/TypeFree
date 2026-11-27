@@ -377,7 +377,9 @@ fun KeyboardScreen(
                                         onSelectEnglishSuggestion = { onAction(ImeUiAction.SelectEnglishSuggestion(it)) },
                                         showAskAiPill = TopBarSlotPolicy.shouldShowTopBarAskAiPill(settings, uiState.tabMode, uiState.isFlypyComposing, uiState.isToolPanelOpen, uiState.isClipboardOpen, uiState.currentInputType, uiState.currentEditorText, uiState.currentImeOptions),
                                         isAskAiFollowUp = uiState.askAiFollowUpArmed && uiState.askAiHistory.isNotEmpty(),
-                                        onOpenAskAiCard = { onAction(ImeUiAction.OpenAskAiCard) }
+                                        onOpenAskAiCard = { onAction(ImeUiAction.OpenAskAiCard) },
+                                        showHelpWritePill = TopBarSlotPolicy.shouldShowTopBarHelpWritePill(uiState.tabMode, uiState.isFlypyComposing, uiState.isToolPanelOpen, uiState.isClipboardOpen, uiState.currentInputType, uiState.currentEditorText, uiState.currentImeOptions),
+                                        onOpenHelpMeWrite = onOpenHelpMeWrite
                                     )
                                 }
 

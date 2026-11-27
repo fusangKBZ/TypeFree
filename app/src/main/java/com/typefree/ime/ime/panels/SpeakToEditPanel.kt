@@ -180,6 +180,7 @@ fun SpeakToEditPanel(
                         val appLang = LocalAppLanguage.current
                         ImeLogic.quickEditChips.forEach { chip ->
                             val chipDisplayLabel = when (chip.id) {
+                                "generate_reply" -> AppStrings.pick(appLang, chip.label, "💬 Generate Reply", "💬 產生回覆")
                                 "smart_polish" -> AppStrings.pick(appLang, chip.label, "✨ Polish", "✨ 智慧潤飾")
                                 "make_formal" -> AppStrings.pick(appLang, chip.label, "💼 Formal", "💼 改正式")
                                 "translate_en" -> AppStrings.pick(appLang, chip.label, "🌐 To English", "🌐 譯英文")

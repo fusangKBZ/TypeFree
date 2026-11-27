@@ -182,6 +182,8 @@ object HelpWriteChipFilter {
         )
     )
 
+    val generateReplyPreset: HelpWritePromptPreset = draftTransformPresets.first()
+
     fun isSocialContentPackage(targetPackage: String): Boolean {
         val pkg = targetPackage.trim().lowercase()
         if (pkg.isEmpty()) return false
@@ -527,7 +529,10 @@ fun HelpMeWritePanel(
                             .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        genres.forEach { preset ->
+                        val modeAPresets = remember(genres) {
+                            listOf(HelpWriteChipFilter.generateReplyPreset) + genres
+                        }
+                        modeAPresets.forEach { preset ->
                             val isSelected = selectedPreset?.id == preset.id
                             val isRecommend = isSocialContent && preset.id == "genre_seed_note" && selectedPreset == null
                             val displayLabel = HelpWriteChipFilter.presetDisplayLabel(preset, appLang)

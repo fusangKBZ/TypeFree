@@ -763,4 +763,85 @@ class V350PureHelpWriteAndAskAiTest {
             host.dispose()
         }
     }
+
+    @Test
+    fun xiaomiFix_helpWriteDraftFallback_and_topBarHelpWriteBesideAskAi() {
+        // 1. Even if readFullEditorTextSafely() returns blank (e.g. HyperOS custom editor),
+        // openOrRestoreVoicePenPanel preserves pre-synced currentEditorText so Mode B + "生成回复" shows.
+        val host = FakeImeHost(
+            initialState = ImeUiState(
+                tabMode = KeyboardTabMode.QWERTY,
+                currentEditorText = "今晚一起吃饭吗"
+            ),
+            simulatedEditorText = ""
+        )
+        val controller = VoiceController(
+            host = host,
+            audioRecorderProvider = { throw UnsupportedOperationException() },
+            onExternalCommitToEngine = {},
+            onResetComposing = {}
+        )
+        try {
+            controller.openOrRestoreVoicePenPanel()
+            assertEquals("今晚一起吃饭吗", host.stateFlow.value.currentEditorText)
+            assertEquals(VoiceSubPanel.HELP_ME_WRITE, host.stateFlow.value.voiceSubPanel)
+        } finally {
+            host.dispose()
+        }
+
+        // 2. Both HelpWriteChipFilter.generateReplyPreset and ImeLogic.quickEditChips expose "💬 生成回复"
+        assertEquals("transform_generate_reply", HelpWriteChipFilter.generateReplyPreset.id)
+        assertEquals("generate_reply", ImeLogic.quickEditChips.first().id)
+
+        // 3. When editor has >= 2 chars, both [Ask AI] and [Help Write] appear side by side in middle lane
+        assertTrue(
+            TopBarSlotPolicy.shouldShowTopBarHelpWritePill(
+                activeTab = KeyboardTabMode.QWERTY,
+                isComposing = false,
+                isToolPanelOpen = false,
+                isClipboardOpen = false,
+                currentInputType = InputType.TYPE_CLASS_TEXT,
+                currentEditorText = "今晚一起吃饭吗"
+            )
+        )
+        assertFalse(
+            TopBarSlotPolicy.shouldShowTopBarHelpWritePill(
+                activeTab = KeyboardTabMode.QWERTY,
+                isComposing = false,
+                isToolPanelOpen = false,
+                isClipboardOpen = false,
+                currentInputType = InputType.TYPE_CLASS_TEXT,
+                currentEditorText = "你"
+            )
+        )
+        val sideBySide = TopBarSlotPolicy.resolveQwertyMiddleAiPills(
+            availableWidthDp = 336f,
+            showUndoButton = false,
+            showClipboardButton = true,
+            isIncognito = false,
+            hasPriorityBanner = false,
+            hasActiveSelection = false,
+            wantAskAi = true,
+            wantJevCopilot = true,
+            wantHelpWrite = true
+        )
+        assertTrue(sideBySide.showAskAi)
+        assertTrue(sideBySide.showHelpWrite)
+        assertFalse(sideBySide.showRewrite)
+
+        // 4. Narrow screen drops secondary HelpWrite pill first while keeping Ask AI
+        val narrowIdle = TopBarSlotPolicy.resolveQwertyMiddleAiPills(
+            availableWidthDp = 270f,
+            showUndoButton = false,
+            showClipboardButton = true,
+            isIncognito = false,
+            hasPriorityBanner = false,
+            hasActiveSelection = false,
+            wantAskAi = true,
+            wantJevCopilot = true,
+            wantHelpWrite = true
+        )
+        assertTrue(narrowIdle.showAskAi)
+        assertFalse(narrowIdle.showHelpWrite)
+    }
 }
