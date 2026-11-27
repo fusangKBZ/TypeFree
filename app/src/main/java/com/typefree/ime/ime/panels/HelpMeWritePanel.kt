@@ -148,8 +148,13 @@ object HelpWriteChipFilter {
         )
     )
 
-    // v3.5: 5大免开口一键成稿动作芯片
+    // v3.5: 免开口一键成稿动作芯片
     val draftTransformPresets: List<HelpWritePromptPreset> = listOf(
+        HelpWritePromptPreset(
+            id = "transform_generate_reply",
+            label = "💬 生成回复",
+            instruction = "请将<selected_text>中的内容视为对方发来的消息、提问或需要回应的内容，结合当前沟通场景与语气风格，直接为我生成一条自然得体、逻辑合理、可直接发送的回复正文（只输出回复正文，不要复述对方原话，不要任何解释、引号或前缀）"
+        ),
         HelpWritePromptPreset(
             id = "transform_expand_note",
             label = "🌱 扩成种草文 ⚡",
@@ -260,6 +265,7 @@ object HelpWriteChipFilter {
             "genre_leave_request" -> AppStrings.pick(lang, preset.label, "🙏 Polite Request", "🙏 請假/求助")
             "genre_weekly_recap" -> AppStrings.pick(lang, preset.label, "📝 Weekly Recap", "📝 週報總結")
             "genre_business_email" -> AppStrings.pick(lang, preset.label, "✉️ Business Email", "✉️ 商務郵件")
+            "transform_generate_reply" -> AppStrings.pick(lang, preset.label, "💬 Generate Reply", "💬 產生回覆")
             "transform_expand_note" -> AppStrings.pick(lang, preset.label, "🌱 Expand Draft ⚡", "🌱 擴成種草文 ⚡")
             "transform_polish" -> AppStrings.pick(lang, preset.label, "✨ Polish", "✨ 潤飾得體")
             "transform_formal" -> AppStrings.pick(lang, preset.label, "👔 Professional", "👔 職場專業")
@@ -463,10 +469,10 @@ fun HelpMeWritePanel(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         HelpWriteChipFilter.draftTransformPresets.forEach { preset ->
-                            val isExpand = preset.id == "transform_expand_note"
-                            val chipBg = if (isExpand) TypeFreeEmerald else palette.cardElevatedBg
-                            val chipBorder = if (isExpand) TypeFreeEmerald else palette.keyBorder
-                            val chipFg = if (isExpand) Color.White else palette.keyTextPrimary
+                            val isPrimaryChip = preset.id == "transform_generate_reply" || preset.id == "transform_expand_note"
+                            val chipBg = if (preset.id == "transform_generate_reply") TypeFreeEmerald else palette.cardElevatedBg
+                            val chipBorder = if (isPrimaryChip) TypeFreeEmerald else palette.keyBorder
+                            val chipFg = if (preset.id == "transform_generate_reply") Color.White else palette.keyTextPrimary
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(14.dp))
@@ -481,7 +487,7 @@ fun HelpMeWritePanel(
                                     text = HelpWriteChipFilter.presetDisplayLabel(preset, appLang),
                                     color = if (isBusy) palette.keyTextMuted else chipFg,
                                     fontSize = 11.5.sp,
-                                    fontWeight = if (isExpand) FontWeight.Bold else FontWeight.Medium
+                                    fontWeight = if (isPrimaryChip) FontWeight.Bold else FontWeight.Medium
                                 )
                             }
                         }

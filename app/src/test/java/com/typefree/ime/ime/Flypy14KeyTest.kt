@@ -408,23 +408,37 @@ class Flypy14KeyTest {
 
     @Test
     fun emojiCatalog_coversMainstreamSocialEmojis_andPrependsRecentsWithoutDuplicates() {
-        assertEquals(6, EmojiCategory.entries.size)
+        assertEquals(9, EmojiCategory.entries.size)
         for (cat in EmojiCategory.entries) {
             assertTrue("Category ${cat.name} must not be empty", EmojiCatalog.emojisFor(cat).isNotEmpty())
         }
-        assertTrue("Expected >= 200 unique mainstream emojis", EmojiCatalog.totalUniqueCount() >= 200)
+        assertTrue("Expected >= 450 unique emojis and shortcodes", EmojiCatalog.totalUniqueCount() >= 450)
 
         val all = EmojiCategory.entries.flatMap { EmojiCatalog.emojisFor(it) }.toSet()
         for (essential in listOf("😂", "🤣", "😭", "🥹", "🙏", "👍", "❤️", "🔥", "🤡", "🐶", "🍉", "☕")) {
             assertTrue("Essential emoji $essential must be present", essential in all)
         }
 
+        val zhihuCodes = EmojiCatalog.emojisFor(EmojiCategory.ZHIHU)
+        val baiduCodes = EmojiCatalog.emojisFor(EmojiCategory.BAIDU)
+        val wechatCodes = EmojiCatalog.emojisFor(EmojiCategory.WECHAT)
+        assertEquals("[狗头]", zhihuCodes[0])
+        assertEquals("#(滑稽)", baiduCodes[0])
+        assertEquals("[旺柴]", wechatCodes[0])
+        assertTrue(zhihuCodes.size >= 30)
+        assertTrue(baiduCodes.size >= 30)
+        assertTrue(wechatCodes.size >= 30)
+        assertTrue(EmojiCatalog.isShortcode("[狗头]"))
+        assertTrue(EmojiCatalog.isShortcode("#(滑稽)"))
+        assertFalse(EmojiCatalog.isShortcode("😂"))
+
         val withRecent = EmojiCatalog.emojisFor(
             category = EmojiCategory.RECENT,
-            recentEmojis = listOf("🍉", "🤡")
+            recentEmojis = listOf("[狗头]", "🍉", "🤡")
         )
-        assertEquals("🍉", withRecent[0])
-        assertEquals("🤡", withRecent[1])
+        assertEquals("[狗头]", withRecent[0])
+        assertEquals("🍉", withRecent[1])
+        assertEquals("🤡", withRecent[2])
         assertEquals("Recents must be deduped", withRecent.size, withRecent.distinct().size)
     }
 }

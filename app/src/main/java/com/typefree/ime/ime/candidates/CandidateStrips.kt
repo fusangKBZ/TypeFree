@@ -78,6 +78,7 @@ fun PredictionCandidateBar(
     englishSuggestions: List<String> = emptyList(),
     onSelectEnglishSuggestion: ((String) -> Unit)? = null,
     showAskAiPill: Boolean = false,
+    isAskAiFollowUp: Boolean = false,
     onOpenAskAiCard: () -> Unit = {}
 ) {
     val palette = LocalTypeFreeKeyboardPalette.current
@@ -264,7 +265,7 @@ fun PredictionCandidateBar(
         }
 
         if (showAskAiPill) {
-            TopBarAskAiPill(onClick = onOpenAskAiCard)
+            TopBarAskAiPill(onClick = onOpenAskAiCard, isFollowUp = isAskAiFollowUp)
         }
 
         // 4. Dismiss Predictions (`×`)

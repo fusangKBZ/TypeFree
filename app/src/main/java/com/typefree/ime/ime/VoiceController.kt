@@ -2680,6 +2680,15 @@ class VoiceController(
         val fullText = if (isPassword) "" else host.readFullEditorTextSafely().trim().ifBlank { stateSnap.currentEditorText.trim() }
         if (fullText.isBlank()) return
 
+        val isContinuing = stateSnap.askAiFollowUpArmed && stateSnap.askAiHistory.isNotEmpty()
+        val completedTurns = if (isContinuing) {
+            stateSnap.askAiHistory.filter { it.answer.isNotBlank() && !it.isLoading }
+        } else {
+            emptyList()
+        }
+        val priorPairs = completedTurns.map { it.query to it.answer }
+        val newTurn = AskAiTurn(query = fullText, isLoading = true)
+
         host.stateFlow.update {
             it.copy(
                 tabMode = KeyboardTabMode.VOICE,
@@ -2689,15 +2698,20 @@ class VoiceController(
                 askAiAnswer = "",
                 isAskAiLoading = true,
                 askAiErrorMessage = null,
+                askAiHistory = completedTurns + newTurn,
+                askAiFollowUpArmed = false,
                 isClipboardOpen = false,
                 isToolPanelOpen = false,
                 selectedHelpWritePreset = null
             )
         }
-        triggerAskAiInference(fullText)
+        triggerAskAiInference(query = fullText, conversationHistory = priorPairs)
     }
 
-    fun triggerAskAiInference(query: String) {
+    fun triggerAskAiInference(
+        query: String,
+        conversationHistory: List<Pair<String, String>> = emptyList()
+    ) {
         askAiJob?.cancel()
         askAiJob = host.scope.launch {
             val settings = host.repository.settings.value
@@ -2705,7 +2719,8 @@ class VoiceController(
             val result = host.aiEngine.runAskAiCardQuery(
                 settings = settings,
                 query = query,
-                targetAppName = snapshot.targetAppName
+                targetAppName = snapshot.targetAppName,
+                conversationHistory = conversationHistory
             )
             result.fold(
                 onSuccess = { exec ->
@@ -2715,25 +2730,52 @@ class VoiceController(
                         featureKey = TokenFeatureKeys.ASK_AI,
                         settings = settings
                     )
-                    host.stateFlow.update {
-                        it.copy(
+                    host.stateFlow.update { prev ->
+                        val updatedTurns = if (prev.askAiHistory.isNotEmpty()) {
+                            prev.askAiHistory.dropLast(1) + prev.askAiHistory.last().copy(
+                                answer = exec.finalOutput,
+                                isLoading = false,
+                                errorMessage = null
+                            )
+                        } else {
+                            listOf(
+                                AskAiTurn(
+                                    query = query,
+                                    answer = exec.finalOutput,
+                                    isLoading = false,
+                                    errorMessage = null
+                                )
+                            )
+                        }
+                        prev.copy(
                             isAskAiLoading = false,
                             askAiAnswer = exec.finalOutput,
-                            askAiErrorMessage = null
+                            askAiErrorMessage = null,
+                            askAiHistory = updatedTurns
                         )
                     }
                 },
                 onFailure = { err ->
                     if (err is CancellationException) return@launch
-                    host.stateFlow.update {
-                        it.copy(
-                            isAskAiLoading = false,
-                            askAiErrorMessage = err.message ?: AppStrings.pick(
-                                settings.appLanguage,
-                                "解答失败，请检查网络或 API 配置",
-                                "Failed to answer — check network or API settings",
-                                "解答失敗，請檢查網路或 API 設定"
+                    val errMsg = err.message ?: AppStrings.pick(
+                        settings.appLanguage,
+                        "解答失败，请检查网络或 API 配置",
+                        "Failed to answer — check network or API settings",
+                        "解答失敗，請檢查網路或 API 設定"
+                    )
+                    host.stateFlow.update { prev ->
+                        val updatedTurns = if (prev.askAiHistory.isNotEmpty()) {
+                            prev.askAiHistory.dropLast(1) + prev.askAiHistory.last().copy(
+                                isLoading = false,
+                                errorMessage = errMsg
                             )
+                        } else {
+                            prev.askAiHistory
+                        }
+                        prev.copy(
+                            isAskAiLoading = false,
+                            askAiErrorMessage = errMsg,
+                            askAiHistory = updatedTurns
                         )
                     }
                 }
@@ -2742,16 +2784,116 @@ class VoiceController(
     }
 
     fun retryAskAiCard() {
-        val q = host.stateFlow.value.askAiQuery
+        val stateSnap = host.stateFlow.value
+        val q = stateSnap.askAiQuery
         if (q.isBlank()) return
         host.performKeyFeedback(strong = false)
-        host.stateFlow.update {
-            it.copy(
+        val priorPairs = if (stateSnap.askAiHistory.size > 1) {
+            stateSnap.askAiHistory.dropLast(1)
+                .filter { it.answer.isNotBlank() && !it.isLoading }
+                .map { it.query to it.answer }
+        } else {
+            emptyList()
+        }
+        host.stateFlow.update { prev ->
+            val updatedTurns = if (prev.askAiHistory.isNotEmpty()) {
+                prev.askAiHistory.dropLast(1) + prev.askAiHistory.last().copy(
+                    isLoading = true,
+                    errorMessage = null
+                )
+            } else {
+                listOf(AskAiTurn(query = q, isLoading = true))
+            }
+            prev.copy(
                 isAskAiLoading = true,
-                askAiErrorMessage = null
+                askAiErrorMessage = null,
+                askAiHistory = updatedTurns
             )
         }
-        triggerAskAiInference(q)
+        triggerAskAiInference(query = q, conversationHistory = priorPairs)
+    }
+
+    fun startAskAiFollowUp() {
+        host.performKeyFeedback(strong = false)
+        askAiJob?.cancel()
+        val stateSnap = host.stateFlow.value
+        val completedTurns = stateSnap.askAiHistory.filter { it.answer.isNotBlank() && !it.isLoading }.ifEmpty {
+            if (stateSnap.askAiQuery.isNotBlank() && stateSnap.askAiAnswer.isNotBlank()) {
+                listOf(AskAiTurn(query = stateSnap.askAiQuery, answer = stateSnap.askAiAnswer))
+            } else {
+                emptyList()
+            }
+        }
+        val originalText = stateSnap.currentEditorText.ifBlank { stateSnap.askAiQuery }
+        if (originalText.isNotBlank()) {
+            replaceFullEditorTextSafely(finalOutput = "", originalText = originalText)
+        }
+        host.stateFlow.update {
+            it.copy(
+                tabMode = KeyboardTabMode.QWERTY,
+                voiceSubPanel = VoiceSubPanel.NONE,
+                currentEditorText = "",
+                undoSnapshot = host.peekTopUndoSnapshot(),
+                isAskAiLoading = false,
+                askAiErrorMessage = null,
+                askAiHistory = completedTurns,
+                askAiFollowUpArmed = completedTurns.isNotEmpty()
+            )
+        }
+        host.showQuickActionToast(
+            AppStrings.pick(
+                host.repository.settings.value.appLanguage,
+                "已保留上下文，打字后点「追问」继续",
+                "Context kept · Type and tap Follow up",
+                "已保留上下文，打字後點「追問」繼續"
+            )
+        )
+    }
+
+    fun sendAskAiQuickFollowUp(prompt: String) {
+        val cleanPrompt = prompt.trim()
+        val stateSnap = host.stateFlow.value
+        if (cleanPrompt.isBlank() || stateSnap.isAskAiLoading) return
+        host.performKeyFeedback(strong = false)
+        val existingTurns = stateSnap.askAiHistory.filter { it.answer.isNotBlank() && !it.isLoading }.ifEmpty {
+            if (stateSnap.askAiQuery.isNotBlank() && stateSnap.askAiAnswer.isNotBlank()) {
+                listOf(AskAiTurn(query = stateSnap.askAiQuery, answer = stateSnap.askAiAnswer))
+            } else {
+                emptyList()
+            }
+        }
+        val priorPairs = existingTurns.map { it.query to it.answer }
+        val newTurn = AskAiTurn(query = cleanPrompt, isLoading = true)
+        host.stateFlow.update {
+            it.copy(
+                tabMode = KeyboardTabMode.VOICE,
+                voiceSubPanel = VoiceSubPanel.ASK_AI_CARD,
+                askAiQuery = cleanPrompt,
+                askAiAnswer = "",
+                isAskAiLoading = true,
+                askAiErrorMessage = null,
+                askAiHistory = existingTurns + newTurn,
+                askAiFollowUpArmed = false
+            )
+        }
+        triggerAskAiInference(query = cleanPrompt, conversationHistory = priorPairs)
+    }
+
+    fun resetAskAiConversation() {
+        host.performKeyFeedback(strong = false)
+        askAiJob?.cancel()
+        host.stateFlow.update {
+            it.copy(
+                tabMode = KeyboardTabMode.QWERTY,
+                voiceSubPanel = VoiceSubPanel.NONE,
+                askAiQuery = "",
+                askAiAnswer = "",
+                isAskAiLoading = false,
+                askAiErrorMessage = null,
+                askAiHistory = emptyList(),
+                askAiFollowUpArmed = false
+            )
+        }
     }
 
     fun returnFromAskAiToQwerty() {
@@ -2779,7 +2921,9 @@ class VoiceController(
                 currentEditorText = "",
                 undoSnapshot = host.peekTopUndoSnapshot(),
                 isAskAiLoading = false,
-                askAiErrorMessage = null
+                askAiErrorMessage = null,
+                askAiHistory = emptyList(),
+                askAiFollowUpArmed = false
             )
         }
         host.showQuickActionToast(
@@ -2821,7 +2965,9 @@ class VoiceController(
                 currentEditorText = answer,
                 undoSnapshot = host.peekTopUndoSnapshot(),
                 isAskAiLoading = false,
-                askAiErrorMessage = null
+                askAiErrorMessage = null,
+                askAiHistory = emptyList(),
+                askAiFollowUpArmed = false
             )
         }
         host.showQuickActionToast(

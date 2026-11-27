@@ -948,17 +948,33 @@ $dictBlock$contextSection
         query: String,
         targetAppName: String = "",
         dictionary: List<DictionaryEntry> = emptyList(),
-        isChineseLocale: Boolean = true
+        isChineseLocale: Boolean = true,
+        conversationHistory: List<Pair<String, String>> = emptyList()
     ): Pair<String, String> {
         val dictBlock = buildDictionaryXmlBlock(dictionary, query, isChineseLocale)
+        val recentTurns = conversationHistory
+            .map { it.first.trim() to it.second.trim() }
+            .filter { it.first.isNotEmpty() && it.second.isNotEmpty() }
+            .takeLast(6)
         if (!isChineseLocale) {
             val appPart = if (targetAppName.isNotBlank()) "Host App: $targetAppName\n" else ""
             val userPrompt = buildString {
                 if (appPart.isNotBlank()) append(appPart)
                 if (dictBlock.isNotBlank()) append(dictBlock)
+                if (recentTurns.isNotEmpty()) {
+                    append("<conversation_history>\n")
+                    recentTurns.forEachIndexed { idx, (q, a) ->
+                        append("[Turn ${idx + 1}]\nQ: $q\nA: $a\n")
+                    }
+                    append("</conversation_history>\n\n")
+                }
                 append("<user_query>\n")
                 append(query.trim())
-                append("\n</user_query>\n\nOutput ONLY a concise, factual plain-text answer (in the language of <user_query>, <= 60 words or compact numbered points, no filler, no Markdown syntax):")
+                if (recentTurns.isNotEmpty()) {
+                    append("\n</user_query>\n\nUsing the conversation history above, output ONLY a concise, factual plain-text answer to the follow-up (<= 60 words or compact numbered points, no filler, no Markdown syntax):")
+                } else {
+                    append("\n</user_query>\n\nOutput ONLY a concise, factual plain-text answer (in the language of <user_query>, <= 60 words or compact numbered points, no filler, no Markdown syntax):")
+                }
             }
             return ASK_AI_CARD_SYSTEM_PROMPT_EN to userPrompt
         }
@@ -966,9 +982,20 @@ $dictBlock$contextSection
         val userPrompt = buildString {
             if (appPart.isNotBlank()) append(appPart)
             if (dictBlock.isNotBlank()) append(dictBlock)
+            if (recentTurns.isNotEmpty()) {
+                append("<conversation_history>\n")
+                recentTurns.forEachIndexed { idx, (q, a) ->
+                    append("[第${idx + 1}轮]\n问：$q\n答：$a\n")
+                }
+                append("</conversation_history>\n\n")
+            }
             append("<user_query>\n")
             append(query.trim())
-            append("\n</user_query>\n\n请直接输出精炼干货解答（180字以内，纯文本，无寒暄，无Markdown标记）：")
+            if (recentTurns.isNotEmpty()) {
+                append("\n</user_query>\n\n请结合以上历史对话上下文，直接输出本轮追问的精炼干货解答（180字以内，纯文本，无寒暄，无Markdown标记）：")
+            } else {
+                append("\n</user_query>\n\n请直接输出精炼干货解答（180字以内，纯文本，无寒暄，无Markdown标记）：")
+            }
         }
         return ASK_AI_CARD_SYSTEM_PROMPT to userPrompt
     }

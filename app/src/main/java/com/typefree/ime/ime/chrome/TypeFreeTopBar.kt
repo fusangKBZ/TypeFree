@@ -812,7 +812,10 @@ fun TypeFreeTopBar(
                         TopBarJevCopilotPill(onClick = onOpenJevCopilot)
                     }
                     if (middleAiPlan.showAskAi) {
-                        TopBarAskAiPill(onClick = onOpenAskAiCard)
+                        TopBarAskAiPill(
+                            onClick = onOpenAskAiCard,
+                            isFollowUp = uiState.askAiFollowUpArmed && uiState.askAiHistory.isNotEmpty()
+                        )
                     }
                 }
             }
@@ -942,18 +945,38 @@ private val AskAiPillIndigo = Color(0xFF6366F1)
 
 @Composable
 fun TopBarAskAiPill(
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    isFollowUp: Boolean = false
 ) {
     val palette = LocalTypeFreeKeyboardPalette.current
-    val fgColor = if (palette.isDark) Color(0xFFA5B4FC) else Color(0xFF4F46E5)
+    val fgColor = when {
+        isFollowUp -> Color.White
+        palette.isDark -> Color(0xFFA5B4FC)
+        else -> Color(0xFF4F46E5)
+    }
+    val bgColor = if (isFollowUp) {
+        AskAiPillIndigo
+    } else {
+        AskAiPillIndigo.copy(alpha = if (palette.isDark) 0.14f else 0.10f)
+    }
+    val borderColor = if (isFollowUp) {
+        Color.Transparent
+    } else {
+        AskAiPillIndigo.copy(alpha = if (palette.isDark) 0.38f else 0.35f)
+    }
+    val label = if (isFollowUp) {
+        tr("追问", "Follow up", "追問")
+    } else {
+        tr("问AI", "Ask AI", "問AI")
+    }
     Row(
         modifier = Modifier
             .height(28.dp)
             .clip(RoundedCornerShape(14.dp))
-            .background(AskAiPillIndigo.copy(alpha = if (palette.isDark) 0.14f else 0.10f))
+            .background(bgColor)
             .border(
                 width = 1.dp,
-                color = AskAiPillIndigo.copy(alpha = if (palette.isDark) 0.38f else 0.35f),
+                color = borderColor,
                 shape = RoundedCornerShape(14.dp)
             )
             .clickable(onClick = onClick)
@@ -963,12 +986,12 @@ fun TopBarAskAiPill(
     ) {
         Icon(
             imageVector = TypeFreeIcons.Search,
-            contentDescription = tr("问AI", "Ask AI", "問AI"),
+            contentDescription = label,
             tint = fgColor,
             modifier = Modifier.size(11.dp)
         )
         Text(
-            text = tr("问AI", "Ask AI", "問AI"),
+            text = label,
             color = fgColor,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,

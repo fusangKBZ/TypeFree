@@ -58,6 +58,13 @@ enum class VoiceSubPanel {
     ASK_AI_CARD
 }
 
+data class AskAiTurn(
+    val query: String,
+    val answer: String = "",
+    val isLoading: Boolean = false,
+    val errorMessage: String? = null
+)
+
 enum class ShiftKeyState {
     OFF,
     ONCE,
@@ -195,7 +202,9 @@ data class ImeUiState(
     val askAiQuery: String = "",
     val askAiAnswer: String = "",
     val isAskAiLoading: Boolean = false,
-    val askAiErrorMessage: String? = null
+    val askAiErrorMessage: String? = null,
+    val askAiHistory: List<AskAiTurn> = emptyList(),
+    val askAiFollowUpArmed: Boolean = false
 ) {
     val hasActiveChatContext: Boolean
         get() = capturedChatContext.hasContext && !ignoreChatContextForThisTurn && !isIncognitoMode

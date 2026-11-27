@@ -75,6 +75,9 @@ sealed interface ImeUiAction {
     data object DismissAskAiAndClearEditor : ImeUiAction
     data object CopyAskAiAnswer : ImeUiAction
     data object CommitAskAiAnswerToEditor : ImeUiAction
+    data object StartAskAiFollowUp : ImeUiAction
+    data class SendAskAiQuickFollowUp(val prompt: String) : ImeUiAction
+    data object ResetAskAiConversation : ImeUiAction
 
     // Style & Preferences
     data object SelectAutoStyle : ImeUiAction

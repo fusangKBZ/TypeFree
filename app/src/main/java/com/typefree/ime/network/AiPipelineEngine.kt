@@ -2237,7 +2237,8 @@ class AiPipelineEngine(
     suspend fun runAskAiCardQuery(
         settings: AppSettings,
         query: String,
-        targetAppName: String = ""
+        targetAppName: String = "",
+        conversationHistory: List<Pair<String, String>> = emptyList()
     ): Result<PipelineExecutionResult> = withContext(Dispatchers.IO) {
         val startMs = System.currentTimeMillis()
         try {
@@ -2260,7 +2261,8 @@ class AiPipelineEngine(
                 query = query,
                 targetAppName = targetAppName,
                 dictionary = settings.dictionary,
-                isChineseLocale = AppStrings.isChinese(settings.appLanguage)
+                isChineseLocale = AppStrings.isChinese(settings.appLanguage),
+                conversationHistory = conversationHistory
             )
             val fallbackGeminiCfg = resolveAvailableGeminiVisionConfig(settings)
             val output: String

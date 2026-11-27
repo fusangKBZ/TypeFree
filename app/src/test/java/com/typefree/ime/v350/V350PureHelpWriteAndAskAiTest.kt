@@ -13,6 +13,7 @@ import com.typefree.ime.data.InMemoryKeyValueStore
 import com.typefree.ime.data.JvmAesGcmCipher
 import com.typefree.ime.data.SecretVault
 import com.typefree.ime.data.VoiceIntentMode
+import com.typefree.ime.ime.AskAiTurn
 import com.typefree.ime.ime.ImeHostCallbacks
 import com.typefree.ime.ime.ImeLogic
 import com.typefree.ime.ime.ImeUiAction
@@ -160,9 +161,11 @@ class V350PureHelpWriteAndAskAiTest {
         assertEquals("genre_moments", wechatGenres[0].id)
         assertEquals("genre_group_announcement", wechatGenres[1].id)
 
-        // 5 大免开口一键成稿动作芯片
-        assertEquals(5, HelpWriteChipFilter.draftTransformPresets.size)
+        // 6 大免开口一键成稿动作芯片（含「生成回复」）
+        assertEquals(6, HelpWriteChipFilter.draftTransformPresets.size)
+        assertEquals("transform_generate_reply", HelpWriteChipFilter.draftTransformPresets[0].id)
         val draftLabels = HelpWriteChipFilter.draftTransformPresets.map { it.label }
+        assertTrue(draftLabels.contains("💬 生成回复"))
         assertTrue(draftLabels.contains("🌱 扩成种草文 ⚡"))
         assertTrue(draftLabels.contains("✨ 润色得体"))
         assertTrue(draftLabels.contains("👔 职场专业"))
@@ -675,6 +678,87 @@ class V350PureHelpWriteAndAskAiTest {
             assertEquals(KeyboardTabMode.QWERTY, host.stateFlow.value.tabMode)
             assertEquals(VoiceSubPanel.NONE, host.stateFlow.value.voiceSubPanel)
             assertTrue(host.stateFlow.value.ignoreSelectionForThisTurn)
+        } finally {
+            host.dispose()
+        }
+    }
+
+    @Test
+    fun askAiCard_multiTurnPromptBuilder_injectsLast6TurnsAndKeepsStaticSystemPrompt() {
+        val longHistory = (1..8).map { idx -> "问题$idx" to "回答$idx" }
+        val (sysZh, userZh) = PromptBuilder.buildAskAiCardPrompts(
+            query = "再举个实际例子",
+            targetAppName = "微信",
+            isChineseLocale = true,
+            conversationHistory = longHistory
+        )
+        assertEquals(PromptBuilder.ASK_AI_CARD_SYSTEM_PROMPT, sysZh)
+        assertTrue(userZh.contains("<conversation_history>"))
+        assertFalse("Old turns beyond last 6 should be trimmed", userZh.contains("问题1"))
+        assertFalse("Old turns beyond last 6 should be trimmed", userZh.contains("问题2"))
+        assertTrue(userZh.contains("问题3"))
+        assertTrue(userZh.contains("回答8"))
+        assertTrue(userZh.contains("再举个实际例子"))
+
+        val (sysEn, userEn) = PromptBuilder.buildAskAiCardPrompts(
+            query = "Give an example",
+            isChineseLocale = false,
+            conversationHistory = listOf("What is Kotlin?" to "A JVM language.")
+        )
+        assertEquals(PromptBuilder.ASK_AI_CARD_SYSTEM_PROMPT_EN, sysEn)
+        assertTrue(userEn.contains("<conversation_history>"))
+        assertTrue(userEn.contains("What is Kotlin?"))
+    }
+
+    @Test
+    fun askAiCard_multiTurnFollowUpAndReset_preservesAndClearsHistorySafely() {
+        val host = FakeImeHost(
+            initialState = ImeUiState(
+                tabMode = KeyboardTabMode.VOICE,
+                voiceSubPanel = VoiceSubPanel.ASK_AI_CARD,
+                currentEditorText = "什么是协程",
+                askAiQuery = "什么是协程",
+                askAiAnswer = "协程是轻量级并发框架。",
+                askAiHistory = listOf(AskAiTurn(query = "什么是协程", answer = "协程是轻量级并发框架。"))
+            )
+        )
+        val controller = VoiceController(
+            host = host,
+            audioRecorderProvider = { throw UnsupportedOperationException() },
+            onExternalCommitToEngine = {},
+            onResetComposing = {}
+        )
+        try {
+            // 1. Start follow-up: clears editor with undo snapshot, arms follow-up, keeps history, returns to QWERTY
+            controller.startAskAiFollowUp()
+            val afterArm = host.stateFlow.value
+            assertEquals(KeyboardTabMode.QWERTY, afterArm.tabMode)
+            assertEquals(VoiceSubPanel.NONE, afterArm.voiceSubPanel)
+            assertTrue(afterArm.askAiFollowUpArmed)
+            assertEquals(1, afterArm.askAiHistory.size)
+            assertEquals("", afterArm.currentEditorText)
+            assertEquals(1, host.undoSnapshots.size)
+
+            // 2. Quick follow-up appends turn 2 and starts loading without resetting turn 1
+            controller.sendAskAiQuickFollowUp("举个例子")
+            val afterQuick = host.stateFlow.value
+            assertEquals(KeyboardTabMode.VOICE, afterQuick.tabMode)
+            assertEquals(VoiceSubPanel.ASK_AI_CARD, afterQuick.voiceSubPanel)
+            assertFalse(afterQuick.askAiFollowUpArmed)
+            assertEquals(2, afterQuick.askAiHistory.size)
+            assertEquals("什么是协程", afterQuick.askAiHistory[0].query)
+            assertEquals("举个例子", afterQuick.askAiHistory[1].query)
+            assertTrue(afterQuick.isAskAiLoading)
+
+            // 3. Reset clears all conversation turns and returns cleanly to QWERTY
+            controller.resetAskAiConversation()
+            val afterReset = host.stateFlow.value
+            assertEquals(KeyboardTabMode.QWERTY, afterReset.tabMode)
+            assertEquals(VoiceSubPanel.NONE, afterReset.voiceSubPanel)
+            assertTrue(afterReset.askAiHistory.isEmpty())
+            assertFalse(afterReset.askAiFollowUpArmed)
+            assertEquals("", afterReset.askAiQuery)
+            assertFalse(afterReset.isAskAiLoading)
         } finally {
             host.dispose()
         }
