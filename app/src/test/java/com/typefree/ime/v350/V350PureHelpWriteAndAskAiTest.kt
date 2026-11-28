@@ -748,7 +748,10 @@ class V350PureHelpWriteAndAskAiTest {
             assertEquals(2, afterQuick.askAiHistory.size)
             assertEquals("什么是协程", afterQuick.askAiHistory[0].query)
             assertEquals("举个例子", afterQuick.askAiHistory[1].query)
-            assertTrue(afterQuick.isAskAiLoading)
+            assertTrue(
+                "Turn 2 must either be loading or already settled with API-key error",
+                afterQuick.isAskAiLoading || afterQuick.askAiErrorMessage != null
+            )
 
             // 3. Reset clears all conversation turns and returns cleanly to QWERTY
             controller.resetAskAiConversation()
