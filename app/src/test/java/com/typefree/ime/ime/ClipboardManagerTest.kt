@@ -2,10 +2,14 @@ package com.typefree.ime.ime
 
 import com.typefree.ime.data.AppRepository
 import com.typefree.ime.data.ClipboardEntry
+import com.typefree.ime.data.InMemoryKeyValueStore
+import com.typefree.ime.data.JvmAesGcmCipher
+import com.typefree.ime.data.SecretVault
 import com.typefree.ime.ime.clipboard.ClipboardFilterTab
 import com.typefree.ime.ime.clipboard.ClipboardSmartExtractor
 import com.typefree.ime.ime.clipboard.SmartClipKind
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -107,5 +111,84 @@ class ClipboardManagerTest {
         assertEquals(200, list.count { !it.isPinned })
         assertTrue(list[0].isPinned && list[1].isPinned)
         assertEquals("临时复制条目 #205", list[2].text)
+    }
+
+    @Test
+    fun `shouldAcceptSystemClipboardSnapshot allows explicit re-copy of deleted text while blocking stale polls`() {
+        // Passive poll with same text and same timestamp must not resurrect deleted item
+        assertFalse(
+            AppRepository.shouldAcceptSystemClipboardSnapshot(
+                normalizedText = "验证码 123456",
+                clipTimestampMs = 1000L,
+                lastObservedText = "验证码 123456",
+                lastObservedTimestampMs = 1000L,
+                fromSystemChangeEvent = false
+            )
+        )
+        // Explicit system OnPrimaryClipChangedListener event MUST accept identical re-copied text
+        assertTrue(
+            AppRepository.shouldAcceptSystemClipboardSnapshot(
+                normalizedText = "验证码 123456",
+                clipTimestampMs = 2000L,
+                lastObservedText = "验证码 123456",
+                lastObservedTimestampMs = 1000L,
+                fromSystemChangeEvent = true
+            )
+        )
+        // Passive poll with newer Android clipboard timestamp also accepts re-copied text
+        assertTrue(
+            AppRepository.shouldAcceptSystemClipboardSnapshot(
+                normalizedText = "验证码 123456",
+                clipTimestampMs = 2000L,
+                lastObservedText = "验证码 123456",
+                lastObservedTimestampMs = 1000L,
+                fromSystemChangeEvent = false
+            )
+        )
+    }
+
+    @Test
+    fun `three clipboard buckets are decoupled with forward-only sync and independent manual entry`() {
+        val store = InMemoryKeyValueStore()
+        val repo = AppRepository(
+            appContext = null,
+            publicStore = store,
+            secretVault = SecretVault(InMemoryKeyValueStore(), JvmAesGcmCipher())
+        )
+
+        // 1. Copy SMS OTP into ALL -> forward-syncs to SMART, does not touch PINNED
+        val allSms = repo.recordClipboardText("【快递】您的验证码是 884210", pinned = false, nowMs = 100L)
+        assertNotNull(allSms)
+        assertEquals(1, repo.clipboardItems.value.size)
+        assertEquals(1, repo.clipboardSmartItems.value.size)
+        assertTrue(repo.clipboardPinnedItems.value.isEmpty())
+
+        // 2. Manual add to PINNED & SMART -> stored independently without adding to ALL
+        val manualPinned = repo.addPinnedClipboardPhrase("上海市浦东新区张江路88号", nowMs = 200L)
+        assertNotNull(manualPinned)
+        val manualSmart = repo.addSmartClipboardEntry("https://example.com/auth", nowMs = 210L)
+        assertNotNull(manualSmart)
+        assertEquals(1, repo.clipboardItems.value.size) // ALL unchanged!
+        assertEquals(1, repo.clipboardPinnedItems.value.size)
+        assertEquals(2, repo.clipboardSmartItems.value.size)
+
+        // 3. Forward-copy from ALL -> PINNED creates an independent copy in PINNED
+        repo.copyAllClipboardItemToPinned(allSms!!.id)
+        assertEquals(2, repo.clipboardPinnedItems.value.size)
+        assertEquals(1, repo.clipboardItems.value.size)
+
+        // 4. Deleting in PINNED or SMART MUST NOT affect ALL!
+        val pinnedSmsId = repo.clipboardPinnedItems.value.first { it.text == allSms.text }.id
+        repo.deleteClipboardItemInTab(ClipboardFilterTab.PINNED, pinnedSmsId)
+        repo.clearClipboardTab(ClipboardFilterTab.SMART)
+        assertEquals(1, repo.clipboardItems.value.size)
+        assertEquals(1, repo.clipboardPinnedItems.value.size)
+        assertTrue(repo.clipboardSmartItems.value.isEmpty())
+
+        // 5. Deleting ALL item MUST NOT affect manual PINNED item
+        repo.deleteClipboardItemInTab(ClipboardFilterTab.ALL, allSms.id)
+        assertTrue(repo.clipboardItems.value.isEmpty())
+        assertEquals(1, repo.clipboardPinnedItems.value.size)
+        assertEquals("上海市浦东新区张江路88号", repo.clipboardPinnedItems.value[0].text)
     }
 }

@@ -92,20 +92,30 @@ fun ClipboardKeyboardPanel(
     onClose: () -> Unit,
     onHideKeyboard: () -> Unit,
     onInsertSpace: () -> Unit,
-    onBackspace: () -> Unit
+    onBackspace: () -> Unit,
+    pinnedItems: List<ClipboardEntry> = items.filter { it.isPinned },
+    smartItems: List<ClipboardEntry> = items.filter { ClipboardSmartExtractor.extractPrimary(it.text) != null },
+    currentEditorText: String = "",
+    onCopyToPinned: (String) -> Unit = onTogglePin,
+    onDeleteInTab: (ClipboardFilterTab, String) -> Unit = { _, id -> onDeleteItem(id) },
+    onClearTab: (ClipboardFilterTab) -> Unit = { _ -> onClearUnpinned() },
+    onSaveTextToTab: (ClipboardFilterTab) -> Unit = { _ -> onSaveSelectionToClipboard() }
 ) {
     val palette = LocalTypeFreeKeyboardPalette.current
     var activeTab by remember { mutableStateOf(ClipboardFilterTab.ALL) }
     var confirmClearArmed by remember { mutableStateOf(false) }
     var bigBangEntry by remember { mutableStateOf<ClipboardEntry?>(null) }
 
-    val pinnedCount = remember(items) { items.count { it.isPinned } }
-    val unpinnedCount = remember(items) { items.count { !it.isPinned } }
-    val smartCount = remember(items) {
-        items.count { ClipboardSmartExtractor.extractPrimary(it.text) != null }
+    val pinnedCount = pinnedItems.size
+    val smartCount = smartItems.size
+    val pinnedTextSet = remember(pinnedItems) { pinnedItems.map { it.text }.toSet() }
+    val filteredItems = when (activeTab) {
+        ClipboardFilterTab.ALL -> items
+        ClipboardFilterTab.PINNED -> pinnedItems
+        ClipboardFilterTab.SMART -> smartItems
     }
-    val filteredItems = remember(items, activeTab) {
-        ClipboardSmartExtractor.filterItems(items, activeTab)
+    val savableEditorText = remember(selectedEditorText, currentEditorText) {
+        selectedEditorText.trim().ifBlank { currentEditorText.trim() }
     }
 
     LaunchedEffect(confirmClearArmed) {
@@ -223,6 +233,29 @@ fun ClipboardKeyboardPanel(
                             maxLines = 1
                         )
                     }
+                } else if (bigBangEntry == null && (activeTab == ClipboardFilterTab.PINNED || activeTab == ClipboardFilterTab.SMART)) {
+                    val canQuickSave = savableEditorText.isNotBlank()
+                    val quickLabel = if (canQuickSave) "+ 存当前" else "+ 添加"
+                    Box(
+                        modifier = Modifier
+                            .height(28.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(TypeFreeEmerald.copy(alpha = 0.15f))
+                            .border(1.dp, TypeFreeEmerald.copy(alpha = 0.48f), RoundedCornerShape(14.dp))
+                            .clickable {
+                                if (canQuickSave) onSaveTextToTab(activeTab) else onOpenClipboardSettings()
+                            }
+                            .padding(horizontal = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = quickLabel,
+                            color = if (palette.isDark) Color(0xFF6EE7B7) else Color(0xFF047857),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1
+                        )
+                    }
                 } else if (selectedEditorText.isNotBlank() && bigBangEntry == null) {
                     Box(
                         modifier = Modifier
@@ -244,7 +277,7 @@ fun ClipboardKeyboardPanel(
                     }
                 }
 
-                if (clipboardEnabled && unpinnedCount > 0 && bigBangEntry == null) {
+                if (clipboardEnabled && filteredItems.isNotEmpty() && bigBangEntry == null) {
                     val clearBg by animateColorAsState(
                         targetValue = if (confirmClearArmed) {
                             TypeFreeRose.copy(alpha = 0.16f)
@@ -268,7 +301,7 @@ fun ClipboardKeyboardPanel(
                             .clickable {
                                 if (confirmClearArmed) {
                                     confirmClearArmed = false
-                                    onClearUnpinned()
+                                    onClearTab(activeTab)
                                 } else {
                                     confirmClearArmed = true
                                 }
@@ -279,7 +312,7 @@ fun ClipboardKeyboardPanel(
                     ) {
                         Icon(
                             imageVector = TypeFreeIcons.Trash,
-                            contentDescription = "清空未置顶",
+                            contentDescription = "清空当前分页",
                             tint = if (confirmClearArmed) TypeFreeRose else palette.keyTextMuted,
                             modifier = Modifier.size(12.5.dp)
                         )
@@ -364,27 +397,31 @@ fun ClipboardKeyboardPanel(
                 filteredItems.isEmpty() -> {
                     val (emptyTitle, emptySub) = when (activeTab) {
                         ClipboardFilterTab.ALL -> {
-                            "剪贴板暂无记录" to "复制任意文字、验证码或网址会自动出现在这里；也可点右上角 ⚙ 添加置顶常用语"
+                            "剪贴板暂无记录" to "复制任意文字、验证码或网址会自动出现在这里（删后重新复制可再次收录）"
                         }
                         ClipboardFilterTab.PINNED -> {
-                            "暂无置顶常用语" to "点击任意卡片右上角 📌 即可固定（清空时永不丢失），或点 ⚙ 添加地址/邮箱/常用回复"
+                            "暂无常用短语" to "在「全部」点 📌 正向存入，或在此一键保存当前文字 / 前往设置页手动输入"
                         }
                         ClipboardFilterTab.SMART -> {
-                            "暂无智能提取内容" to "复制含验证码、菜鸟/丰巢取件码、快递单号、网址或手机号的消息时，将自动提取一键填入胶囊"
+                            "暂无智能提取内容" to "复制验证码/取件码/单号/链接/手机号会自动正向同步至此，也可手动添加"
                         }
+                    }
+                    val hasSavableText = savableEditorText.isNotBlank()
+                    val emptyActionLabel = when (activeTab) {
+                        ClipboardFilterTab.ALL -> if (hasSavableText) "📌 将当前文字存为常用" else "+ 手动添加常用短语"
+                        ClipboardFilterTab.PINNED -> if (hasSavableText) "📌 存当前文字为常用" else "+ 手动输入常用短语"
+                        ClipboardFilterTab.SMART -> if (hasSavableText) "✨ 存当前文字到提取" else "+ 手动添加提取内容"
                     }
                     ClipboardEmptyOrDisabledCard(
                         title = emptyTitle,
                         subtitle = emptySub,
-                        primaryActionLabel = if (selectedEditorText.isNotBlank()) {
-                            "📌 将当前选中文字存为常用语"
-                        } else {
-                            "+ 添加常用短语"
-                        },
-                        onPrimaryAction = if (selectedEditorText.isNotBlank()) {
-                            onSaveSelectionToClipboard
-                        } else {
-                            onOpenClipboardSettings
+                        primaryActionLabel = emptyActionLabel,
+                        onPrimaryAction = {
+                            if (hasSavableText) {
+                                onSaveTextToTab(activeTab)
+                            } else {
+                                onOpenClipboardSettings()
+                            }
                         }
                     )
                 }
@@ -400,16 +437,18 @@ fun ClipboardKeyboardPanel(
                     ) {
                         items(
                             items = filteredItems,
-                            key = { it.id }
+                            key = { "${activeTab.name}_${it.id}" }
                         ) { entry ->
                             ClipboardItemCard(
                                 entry = entry,
                                 nowMs = nowMs,
+                                showPinAction = activeTab != ClipboardFilterTab.PINNED,
+                                isAlreadyInPinned = activeTab == ClipboardFilterTab.PINNED || entry.text in pinnedTextSet,
                                 onPasteFull = { onPasteText(entry.text) },
                                 onPasteExtracted = { token -> onPasteText(token) },
                                 onOpenBigBang = { bigBangEntry = entry },
-                                onTogglePin = { onTogglePin(entry.id) },
-                                onDelete = { onDeleteItem(entry.id) }
+                                onTogglePin = { onCopyToPinned(entry.id) },
+                                onDelete = { onDeleteInTab(activeTab, entry.id) }
                             )
                         }
                     }
@@ -726,6 +765,8 @@ private fun ClipboardFilterPill(
 private fun ClipboardItemCard(
     entry: ClipboardEntry,
     nowMs: Long,
+    showPinAction: Boolean = true,
+    isAlreadyInPinned: Boolean = entry.isPinned,
     onPasteFull: () -> Unit,
     onPasteExtracted: (String) -> Unit,
     onOpenBigBang: () -> Unit,
@@ -762,12 +803,12 @@ private fun ClipboardItemCard(
     }
 
     val cardBorderColor = when {
-        entry.isPinned -> TypeFreeAmber.copy(alpha = if (palette.isDark) 0.55f else 0.65f)
+        isAlreadyInPinned -> TypeFreeAmber.copy(alpha = if (palette.isDark) 0.55f else 0.65f)
         else -> palette.keyBorder
     }
     val cardBgColor = when {
-        entry.isPinned && palette.isDark -> Color(0xFF282621)
-        entry.isPinned && !palette.isDark -> Color(0xFFFFFCF5)
+        isAlreadyInPinned && palette.isDark -> Color(0xFF282621)
+        isAlreadyInPinned && !palette.isDark -> Color(0xFFFFFCF5)
         else -> palette.keyCapBg
     }
 
@@ -797,7 +838,7 @@ private fun ClipboardItemCard(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 modifier = Modifier.weight(1f)
             ) {
-                if (entry.isPinned) {
+                if (isAlreadyInPinned) {
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(5.dp))
@@ -805,7 +846,7 @@ private fun ClipboardItemCard(
                             .padding(horizontal = 4.dp, vertical = 1.dp)
                     ) {
                         Text(
-                            text = "置顶",
+                            text = if (showPinAction) "已常用" else "常用",
                             color = if (palette.isDark) Color(0xFFFCD34D) else Color(0xFFB45309),
                             fontSize = 10.5.sp,
                             fontWeight = FontWeight.Bold,
@@ -866,22 +907,24 @@ private fun ClipboardItemCard(
                     )
                 }
 
-                Box(
-                    modifier = Modifier
-                        .size(22.dp)
-                        .clip(CircleShape)
-                        .background(
-                            if (entry.isPinned) TypeFreeAmber.copy(alpha = 0.18f) else Color.Transparent
+                if (showPinAction) {
+                    Box(
+                        modifier = Modifier
+                            .size(22.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (isAlreadyInPinned) TypeFreeAmber.copy(alpha = 0.18f) else Color.Transparent
+                            )
+                            .clickable(onClick = onTogglePin),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = TypeFreeIcons.Pin,
+                            contentDescription = "存入常用",
+                            tint = if (isAlreadyInPinned) TypeFreeAmber else palette.keyTextMuted,
+                            modifier = Modifier.size(12.5.dp)
                         )
-                        .clickable(onClick = onTogglePin),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = TypeFreeIcons.Pin,
-                        contentDescription = if (entry.isPinned) "取消置顶" else "置顶常用",
-                        tint = if (entry.isPinned) TypeFreeAmber else palette.keyTextMuted,
-                        modifier = Modifier.size(12.5.dp)
-                    )
+                    }
                 }
 
                 Box(

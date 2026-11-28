@@ -44,6 +44,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -74,6 +75,7 @@ import com.typefree.ime.data.stats.StatsTimeRange
 import com.typefree.ime.i18n.AppStrings
 import com.typefree.ime.i18n.LocalAppLanguage
 import com.typefree.ime.i18n.tr
+import com.typefree.ime.ime.clipboard.ClipboardFilterTab
 import com.typefree.ime.network.AppUpdateChecker
 import com.typefree.ime.network.UpdateCheckInfo
 import com.typefree.ime.ui.components.ContinuousRoundedCornerShape
@@ -92,6 +94,8 @@ fun GeneralSettingsScreen(
     val coroutineScope = rememberCoroutineScope()
     val settings by repository.settings.collectAsState()
     val clipboardItems by repository.clipboardItems.collectAsState()
+    val pinnedClipboardItems by repository.clipboardPinnedItems.collectAsState()
+    val smartClipboardItems by repository.clipboardSmartItems.collectAsState()
     val statsRev by repository.dailyStatsRevision.collectAsState()
     val statsMeta = remember(settings, statsRev) {
         repository.computeInsightsSnapshot(StatsTimeRange.ALL)
@@ -334,14 +338,23 @@ fun GeneralSettingsScreen(
                 }
             }
 
-            // 3. 内置剪贴板历史管理
+            // 3. 内置剪贴板与常用语管理（全部 / 常用 / 提取 三仓独立）
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(18.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f))
             ) {
-                val unpinnedCount = remember(clipboardItems) { clipboardItems.count { !it.isPinned } }
+                var selectedClipboardTab by rememberSaveable { mutableStateOf(ClipboardFilterTab.PINNED) }
+                var manualClipDraft by rememberSaveable { mutableStateOf("") }
+                val activeTabItems = when (selectedClipboardTab) {
+                    ClipboardFilterTab.ALL -> clipboardItems
+                    ClipboardFilterTab.PINNED -> pinnedClipboardItems
+                    ClipboardFilterTab.SMART -> smartClipboardItems
+                }
+                val pinnedTexts = remember(pinnedClipboardItems) {
+                    pinnedClipboardItems.map { it.text }.toSet()
+                }
 
                 Column(
                     modifier = Modifier
@@ -359,32 +372,33 @@ fun GeneralSettingsScreen(
                             verticalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
                             Text(
-                                text = tr("内置剪贴板历史管理", "Clipboard History", "內建剪貼簿歷史管理"),
+                                text = tr("内置剪贴板与常用语", "Clipboard & Snippets", "內建剪貼簿與常用語"),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
                                 text = tr(
-                                    "键盘顶栏可唤起双列剪贴板，支持置顶常用语 (${clipboardItems.size} 条)",
-                                    "Two-column clipboard in keyboard top bar with pin support (${clipboardItems.size} items)",
-                                    "鍵盤頂欄可喚起雙欄剪貼簿，支援置頂常用語 (${clipboardItems.size} 條)"
+                                    "全部 ${clipboardItems.size} · 常用 ${pinnedClipboardItems.size} · 提取 ${smartClipboardItems.size}（常用与提取独立编辑）",
+                                    "All ${clipboardItems.size} · Pinned ${pinnedClipboardItems.size} · Smart ${smartClipboardItems.size}",
+                                    "全部 ${clipboardItems.size} · 常用 ${pinnedClipboardItems.size} · 提取 ${smartClipboardItems.size}"
                                 ),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        if (unpinnedCount > 0) {
+                        if (activeTabItems.isNotEmpty()) {
                             TextButton(
                                 onClick = {
-                                    repository.clearUnpinnedClipboardItems()
-                                    Toast.makeText(
-                                        context,
-                                        AppStrings.pick(appLang, "已清空未置顶剪贴板记录", "Cleared unpinned clipboard items", "已清空未置頂剪貼簿紀錄"),
-                                        Toast.LENGTH_SHORT
-                                    ).show()
+                                    repository.clearClipboardTab(selectedClipboardTab)
+                                    val msg = when (selectedClipboardTab) {
+                                        ClipboardFilterTab.ALL -> AppStrings.pick(appLang, "已清空「全部」历史记录", "Cleared All history", "已清空「全部」歷史紀錄")
+                                        ClipboardFilterTab.PINNED -> AppStrings.pick(appLang, "已清空「常用」短语", "Cleared Pinned phrases", "已清空「常用」短語")
+                                        ClipboardFilterTab.SMART -> AppStrings.pick(appLang, "已清空「提取」记录", "Cleared Smart items", "已清空「提取」紀錄")
+                                    }
+                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                                 }
                             ) {
-                                Text(tr("清空未置顶 ($unpinnedCount)", "Clear ($unpinnedCount)", "清空未置頂 ($unpinnedCount)"))
+                                Text(tr("清空当前 (${activeTabItems.size})", "Clear (${activeTabItems.size})", "清空目前 (${activeTabItems.size})"))
                             }
                         }
                     }
@@ -417,15 +431,88 @@ fun GeneralSettingsScreen(
                         }
                     )
 
-                    if (clipboardItems.isNotEmpty()) {
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
-                        Text(
-                            text = tr("最近记录预览（可置顶或删除）", "Recent Items (Pin or Delete)", "最近紀錄預覽（可置頂或刪除）"),
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
+
+                    // Tab selector: 常用 / 提取 / 全部
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf(
+                            ClipboardFilterTab.PINNED to tr("📌 常用 (${pinnedClipboardItems.size})", "📌 Pinned (${pinnedClipboardItems.size})", "📌 常用 (${pinnedClipboardItems.size})"),
+                            ClipboardFilterTab.SMART to tr("✨ 提取 (${smartClipboardItems.size})", "✨ Smart (${smartClipboardItems.size})", "✨ 提取 (${smartClipboardItems.size})"),
+                            ClipboardFilterTab.ALL to tr("全部 (${clipboardItems.size})", "All (${clipboardItems.size})", "全部 (${clipboardItems.size})")
+                        ).forEach { (tab, label) ->
+                            FilterChip(
+                                selected = selectedClipboardTab == tab,
+                                onClick = { selectedClipboardTab = tab },
+                                label = { Text(label, maxLines = 1) }
+                            )
+                        }
+                    }
+
+                    // Manual entry box for 常用 & 提取 tabs
+                    if (selectedClipboardTab == ClipboardFilterTab.PINNED || selectedClipboardTab == ClipboardFilterTab.SMART) {
+                        val isPinnedTab = selectedClipboardTab == ClipboardFilterTab.PINNED
+                        OutlinedTextField(
+                            value = manualClipDraft,
+                            onValueChange = { manualClipDraft = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            placeholder = {
+                                Text(
+                                    if (isPinnedTab) {
+                                        tr("输入常用短语、地址、邮箱、卡号或常用回复…", "Enter phrase, address, email, or template…", "輸入常用短語、地址、信箱或常用回覆…")
+                                    } else {
+                                        tr("输入含验证码、取件码、链接、手机号等提取内容…", "Enter code, URL, phone number, or tracking info…", "輸入含驗證碼、取件碼、連結或手機號等內容…")
+                                    }
+                                )
+                            },
+                            minLines = 2,
+                            maxLines = 4
                         )
-                        clipboardItems.take(8).forEach { item ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            Button(
+                                onClick = {
+                                    val trimmed = manualClipDraft.trim()
+                                    if (trimmed.isNotEmpty()) {
+                                        if (isPinnedTab) {
+                                            repository.addPinnedClipboardPhrase(trimmed)
+                                            Toast.makeText(
+                                                context,
+                                                AppStrings.pick(appLang, "已添加到「常用」", "Added to Pinned", "已加到「常用」"),
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        } else {
+                                            repository.addSmartClipboardEntry(trimmed)
+                                            Toast.makeText(
+                                                context,
+                                                AppStrings.pick(appLang, "已添加到「提取」", "Added to Smart", "已加到「提取」"),
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                        manualClipDraft = ""
+                                    }
+                                },
+                                enabled = manualClipDraft.trim().isNotEmpty()
+                            ) {
+                                Text(
+                                    if (isPinnedTab) {
+                                        tr("+ 添加到常用", "+ Add to Pinned", "+ 加到常用")
+                                    } else {
+                                        tr("+ 添加到提取", "+ Add to Smart", "+ 加到提取")
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    if (activeTabItems.isNotEmpty()) {
+                        val previewLimit = if (selectedClipboardTab == ClipboardFilterTab.ALL) 12 else 30
+                        activeTabItems.take(previewLimit).forEach { item ->
+                            val isAlreadyPinned = item.text in pinnedTexts
                             Surface(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(10.dp),
@@ -446,19 +533,28 @@ fun GeneralSettingsScreen(
                                         modifier = Modifier.weight(1f)
                                     )
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        IconButton(
-                                            onClick = { repository.togglePinClipboardItem(item.id) },
-                                            modifier = Modifier.size(30.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = TypeFreeIcons.Pin,
-                                                contentDescription = if (item.isPinned) tr("取消置顶", "Unpin", "取消置頂") else tr("置顶", "Pin", "置頂"),
-                                                tint = if (item.isPinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                                modifier = Modifier.size(16.dp)
-                                            )
+                                        if (selectedClipboardTab != ClipboardFilterTab.PINNED) {
+                                            IconButton(
+                                                onClick = {
+                                                    repository.copyAllClipboardItemToPinned(item.id)
+                                                    Toast.makeText(
+                                                        context,
+                                                        AppStrings.pick(appLang, "已存入「常用」", "Copied to Pinned", "已存入「常用」"),
+                                                        Toast.LENGTH_SHORT
+                                                    ).show()
+                                                },
+                                                modifier = Modifier.size(30.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = TypeFreeIcons.Pin,
+                                                    contentDescription = tr("存入常用", "Copy to Pinned", "存入常用"),
+                                                    tint = if (isAlreadyPinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
                                         }
                                         IconButton(
-                                            onClick = { repository.deleteClipboardItem(item.id) },
+                                            onClick = { repository.deleteClipboardItemInTab(selectedClipboardTab, item.id) },
                                             modifier = Modifier.size(30.dp)
                                         ) {
                                             Icon(

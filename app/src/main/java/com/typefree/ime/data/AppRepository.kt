@@ -18,6 +18,8 @@ import com.typefree.ime.data.stats.SqliteDailyStatsBackend
 import com.typefree.ime.data.stats.StatsTimeRange
 import com.typefree.ime.data.stats.TokenUsageSnapshot
 import com.typefree.ime.i18n.AppStrings
+import com.typefree.ime.ime.clipboard.ClipboardFilterTab
+import com.typefree.ime.ime.clipboard.ClipboardSmartExtractor
 import com.typefree.ime.ime.jev.memory.AnchorSaltProvider
 import com.typefree.ime.ime.jev.memory.AndroidKeystoreSaltProvider
 import com.typefree.ime.ime.jev.memory.ConversationAnchorExtractor
@@ -102,6 +104,20 @@ class AppRepository(
 
     private val _clipboardItems = MutableStateFlow(loadClipboardInternal())
     val clipboardItems: StateFlow<List<ClipboardEntry>> = _clipboardItems.asStateFlow()
+
+    private val _clipboardPinnedItems = MutableStateFlow(
+        loadClipboardBucketInternal(KEY_CLIPBOARD_PINNED, forcePinned = true)
+    )
+    val clipboardPinnedItems: StateFlow<List<ClipboardEntry>> = _clipboardPinnedItems.asStateFlow()
+
+    private val _clipboardSmartItems = MutableStateFlow(
+        loadClipboardBucketInternal(KEY_CLIPBOARD_SMART, forcePinned = false)
+    )
+    val clipboardSmartItems: StateFlow<List<ClipboardEntry>> = _clipboardSmartItems.asStateFlow()
+
+    init {
+        migrateClipboardBucketsIfNeeded()
+    }
 
     private val _isImeWindowVisible = MutableStateFlow(false)
     val isImeWindowVisible: StateFlow<Boolean> = _isImeWindowVisible.asStateFlow()
@@ -634,7 +650,12 @@ class AppRepository(
 
     @Suppress("SENSELESS_COMPARISON")
     private fun loadClipboardInternal(): List<ClipboardEntry> {
-        val raw = publicStore.getString(KEY_CLIPBOARD, null) ?: return emptyList()
+        return loadClipboardBucketInternal(KEY_CLIPBOARD, forcePinned = null)
+    }
+
+    @Suppress("SENSELESS_COMPARISON")
+    private fun loadClipboardBucketInternal(key: String, forcePinned: Boolean?): List<ClipboardEntry> {
+        val raw = publicStore.getString(key, null) ?: return emptyList()
         return try {
             val type = object : TypeToken<List<ClipboardEntry>>() {}.type
             val list = gson.fromJson<List<ClipboardEntry>>(raw, type) ?: emptyList()
@@ -645,7 +666,8 @@ class AppRepository(
                     else item.copy(
                         id = item.id.ifBlank { UUID.randomUUID().toString() },
                         text = clean,
-                        timestamp = if (item.timestamp <= 0L) System.currentTimeMillis() else item.timestamp
+                        timestamp = if (item.timestamp <= 0L) System.currentTimeMillis() else item.timestamp,
+                        isPinned = forcePinned ?: item.isPinned
                     )
                 }
             )
@@ -654,10 +676,65 @@ class AppRepository(
         }
     }
 
+    private fun migrateClipboardBucketsIfNeeded() {
+        if (publicStore.getBoolean(KEY_CLIPBOARD_V2_MIGRATED, false)) return
+        val legacyAll = _clipboardItems.value
+        if (legacyAll.isNotEmpty()) {
+            if (_clipboardPinnedItems.value.isEmpty()) {
+                val seededPinned = legacyAll.filter { it.isPinned }.map {
+                    it.copy(id = UUID.randomUUID().toString(), isPinned = true)
+                }
+                if (seededPinned.isNotEmpty()) {
+                    saveClipboardBucket(_clipboardPinnedItems, KEY_CLIPBOARD_PINNED, seededPinned)
+                }
+            }
+            if (_clipboardSmartItems.value.isEmpty()) {
+                val seededSmart = legacyAll
+                    .filter { ClipboardSmartExtractor.extractPrimary(it.text) != null }
+                    .map { it.copy(id = UUID.randomUUID().toString(), isPinned = false) }
+                if (seededSmart.isNotEmpty()) {
+                    saveClipboardBucket(_clipboardSmartItems, KEY_CLIPBOARD_SMART, seededSmart)
+                }
+            }
+        }
+        publicStore.putBoolean(KEY_CLIPBOARD_V2_MIGRATED, true)
+    }
+
     private fun saveClipboardList(updated: List<ClipboardEntry>) {
+        saveClipboardBucket(_clipboardItems, KEY_CLIPBOARD, updated)
+    }
+
+    private fun saveClipboardBucket(
+        targetFlow: MutableStateFlow<List<ClipboardEntry>>,
+        storageKey: String,
+        updated: List<ClipboardEntry>
+    ) {
         val sorted = sortClipboardEntries(updated)
-        _clipboardItems.value = sorted
-        publicStore.putString(KEY_CLIPBOARD, gson.toJson(sorted))
+        targetFlow.value = sorted
+        publicStore.putString(storageKey, gson.toJson(sorted))
+    }
+
+    private fun upsertBucketEntry(
+        existing: List<ClipboardEntry>,
+        rawText: String,
+        isPinned: Boolean,
+        nowMs: Long,
+        maxItems: Int
+    ): Pair<List<ClipboardEntry>, ClipboardEntry?> {
+        val trimmed = rawText.trim()
+        if (trimmed.isEmpty()) return existing to null
+        val capped = if (trimmed.length > MAX_CLIP_CHARS) trimmed.take(MAX_CLIP_CHARS) else trimmed
+        val matched = existing.firstOrNull { it.text == capped }
+        val entry = if (matched != null) {
+            matched.copy(timestamp = nowMs, isPinned = isPinned)
+        } else {
+            ClipboardEntry(text = capped, timestamp = nowMs, isPinned = isPinned)
+        }
+        val others = existing.filterNot { it.text == capped }
+        val combined = (listOf(entry) + others)
+            .sortedByDescending { it.timestamp }
+            .take(maxItems.coerceAtLeast(1))
+        return combined to entry
     }
 
     fun recordClipboardText(
@@ -675,8 +752,96 @@ class AppRepository(
         )
         if (entry != null) {
             saveClipboardList(updated)
+            // Forward-only sync from ALL -> PINNED / SMART
+            if (pinned) {
+                addPinnedClipboardPhrase(entry.text, nowMs = nowMs)
+            }
+            if (ClipboardSmartExtractor.extractPrimary(entry.text) != null) {
+                addSmartClipboardEntry(entry.text, nowMs = nowMs)
+            }
         }
         return entry
+    }
+
+    fun addPinnedClipboardPhrase(
+        rawText: String,
+        nowMs: Long = System.currentTimeMillis()
+    ): ClipboardEntry? {
+        val (updated, entry) = upsertBucketEntry(
+            existing = _clipboardPinnedItems.value,
+            rawText = rawText,
+            isPinned = true,
+            nowMs = nowMs,
+            maxItems = MAX_CLIPBOARD_UNPINNED
+        )
+        if (entry != null) {
+            saveClipboardBucket(_clipboardPinnedItems, KEY_CLIPBOARD_PINNED, updated)
+        }
+        return entry
+    }
+
+    fun addSmartClipboardEntry(
+        rawText: String,
+        nowMs: Long = System.currentTimeMillis()
+    ): ClipboardEntry? {
+        val (updated, entry) = upsertBucketEntry(
+            existing = _clipboardSmartItems.value,
+            rawText = rawText,
+            isPinned = false,
+            nowMs = nowMs,
+            maxItems = MAX_CLIPBOARD_SMART
+        )
+        if (entry != null) {
+            saveClipboardBucket(_clipboardSmartItems, KEY_CLIPBOARD_SMART, updated)
+        }
+        return entry
+    }
+
+    fun copyAllClipboardItemToPinned(id: String): ClipboardEntry? {
+        val source = _clipboardItems.value.firstOrNull { it.id == id }
+            ?: _clipboardSmartItems.value.firstOrNull { it.id == id }
+            ?: return null
+        return addPinnedClipboardPhrase(source.text)
+    }
+
+    fun deleteClipboardItemInTab(tab: ClipboardFilterTab, id: String) {
+        when (tab) {
+            ClipboardFilterTab.ALL -> deleteClipboardItem(id)
+            ClipboardFilterTab.PINNED -> {
+                val curr = _clipboardPinnedItems.value
+                val updated = curr.filterNot { it.id == id }
+                if (updated.size != curr.size) {
+                    saveClipboardBucket(_clipboardPinnedItems, KEY_CLIPBOARD_PINNED, updated)
+                }
+            }
+            ClipboardFilterTab.SMART -> {
+                val curr = _clipboardSmartItems.value
+                val updated = curr.filterNot { it.id == id }
+                if (updated.size != curr.size) {
+                    saveClipboardBucket(_clipboardSmartItems, KEY_CLIPBOARD_SMART, updated)
+                }
+            }
+        }
+    }
+
+    fun clearClipboardTab(tab: ClipboardFilterTab) {
+        when (tab) {
+            ClipboardFilterTab.ALL -> {
+                if (_clipboardItems.value.isNotEmpty()) {
+                    saveClipboardList(emptyList())
+                }
+            }
+            ClipboardFilterTab.PINNED -> {
+                if (_clipboardPinnedItems.value.isNotEmpty()) {
+                    saveClipboardBucket(_clipboardPinnedItems, KEY_CLIPBOARD_PINNED, emptyList())
+                }
+            }
+            ClipboardFilterTab.SMART -> {
+                if (_clipboardSmartItems.value.isNotEmpty()) {
+                    saveClipboardBucket(_clipboardSmartItems, KEY_CLIPBOARD_SMART, emptyList())
+                }
+            }
+        }
     }
 
     fun togglePinClipboardItem(id: String) {
@@ -868,6 +1033,13 @@ class AppRepository(
         if (mergedCount > 0 || current.size != _clipboardItems.value.size) {
             saveClipboardList(current)
         }
+        for (raw in items) {
+            val cleanText = raw.text.trim()
+            if (cleanText.isNotEmpty()) {
+                val safeTs = if (raw.timestamp > 0L) raw.timestamp else System.currentTimeMillis()
+                addPinnedClipboardPhrase(cleanText, nowMs = safeTs)
+            }
+        }
         return mergedCount
     }
 
@@ -1048,13 +1220,36 @@ class AppRepository(
         internal const val KEY_SETTINGS = "settings_v1"
         internal const val KEY_HISTORY = "history_v1"
         internal const val KEY_CLIPBOARD = "clipboard_v1"
+        internal const val KEY_CLIPBOARD_PINNED = "typefree_clipboard_pinned_v2"
+        internal const val KEY_CLIPBOARD_SMART = "typefree_clipboard_smart_v2"
+        internal const val KEY_CLIPBOARD_V2_MIGRATED = "typefree_clipboard_v2_migrated"
         private const val KEY_MIGRATED_V30_LIVE_WRITE_DEFAULT = "migrated_v30_live_write_default"
         internal const val KEY_MIGRATED_V340_COMPACT_4ROW_AND_LIFT = "mig_v340_compact_4row_and_lift"
         internal const val KEY_MIGRATED_V360_XIAOHE_SCHEME = "mig_v360_xiaohe_scheme"
         internal const val KEY_DAILY_STATS_BACKFILLED = "daily_stats_backfilled_v1"
         private const val MAX_HISTORY_ITEMS = 200
         private const val MAX_CLIPBOARD_UNPINNED = 200
+        private const val MAX_CLIPBOARD_SMART = 100
         private const val MAX_CLIP_CHARS = 4000
+
+        /**
+         * Determines whether the current system clipboard snapshot should be recorded:
+         * - Explicit system `OnPrimaryClipChangedListener` notifications always accept re-copied text even if identical.
+         * - Passive polls (e.g. `onStartInputView` or opening panel) skip identical text unless `clipTimestampMs` changed,
+         *   preventing deleted entries from resurrecting while still catching external updates.
+         */
+        fun shouldAcceptSystemClipboardSnapshot(
+            normalizedText: String,
+            clipTimestampMs: Long,
+            lastObservedText: String?,
+            lastObservedTimestampMs: Long,
+            fromSystemChangeEvent: Boolean
+        ): Boolean {
+            if (normalizedText.isBlank()) return false
+            if (fromSystemChangeEvent) return true
+            if (normalizedText != lastObservedText) return true
+            return clipTimestampMs > 0L && clipTimestampMs != lastObservedTimestampMs
+        }
         private val PUNCT_OR_SPACE_ONLY = Regex("^[\\s\\p{Punct}，。？！、：；“”‘’（）【】《》…—\\-]+$")
 
         internal fun resolveUpgradedInputScheme(

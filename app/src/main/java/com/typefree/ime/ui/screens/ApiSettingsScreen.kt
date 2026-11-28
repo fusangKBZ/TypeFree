@@ -223,12 +223,13 @@ fun ApiSettingsScreen(
     // Backup / Import status banner & full backup module toggles
     val historyItems by repository.history.collectAsState()
     val clipboardItems by repository.clipboardItems.collectAsState()
+    val pinnedClipboardItems by repository.clipboardPinnedItems.collectAsState()
     val statsRevision by repository.dailyStatsRevision.collectAsState()
     val dailyStatsDaysCount = remember(statsRevision) {
         repository.dailyStatsStore.listAllRecords().size
     }
-    val pinnedClipboardCount = remember(clipboardItems) {
-        clipboardItems.count { it.isPinned }
+    val pinnedClipboardCount = remember(pinnedClipboardItems, clipboardItems) {
+        (pinnedClipboardItems.map { it.text } + clipboardItems.filter { it.isPinned }.map { it.text }).toSet().size
     }
 
     var backupStatusMsg by remember { mutableStateOf<String?>(null) }
@@ -347,7 +348,7 @@ fun ApiSettingsScreen(
                         history = if (options.includeHistory) repository.history.value else emptyList(),
                         dailyStats = dailyStats,
                         predictions = predictions,
-                        pinnedClipboard = if (options.includePinnedClipboard) repository.clipboardItems.value else emptyList(),
+                        pinnedClipboard = if (options.includePinnedClipboard) (repository.clipboardPinnedItems.value + repository.clipboardItems.value.filter { it.isPinned }).distinctBy { it.text } else emptyList(),
                         memoryRepository = repository.jevMemoryRepository,
                         memoryPassphrase = passChars,
                         wipePassphraseAfterUse = true
@@ -1106,7 +1107,7 @@ fun ApiSettingsScreen(
                                     history = if (options.includeHistory) repository.history.value else emptyList(),
                                     dailyStats = dailyStats,
                                     predictions = predictions,
-                                    pinnedClipboard = if (options.includePinnedClipboard) repository.clipboardItems.value else emptyList(),
+                                    pinnedClipboard = if (options.includePinnedClipboard) (repository.clipboardPinnedItems.value + repository.clipboardItems.value.filter { it.isPinned }).distinctBy { it.text } else emptyList(),
                                     memoryRepository = repository.jevMemoryRepository,
                                     memoryPassphrase = passChars,
                                     wipePassphraseAfterUse = true

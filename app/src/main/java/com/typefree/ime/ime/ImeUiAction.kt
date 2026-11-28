@@ -3,6 +3,7 @@ package com.typefree.ime.ime
 import com.typefree.ime.data.KeyboardHeightMode
 import com.typefree.ime.data.ToneStyle
 import com.typefree.ime.data.VoiceIntentMode
+import com.typefree.ime.ime.clipboard.ClipboardFilterTab
 import com.typefree.ime.ime.jev.memory.GroupSceneTag
 import com.typefree.ime.ime.jev.memory.PrivateRelationTag
 
@@ -138,6 +139,10 @@ sealed interface ImeUiAction {
     data class DeleteClipboardItem(val id: String) : ImeUiAction
     data object ClearUnpinnedClipboard : ImeUiAction
     data object SaveSelectionToClipboard : ImeUiAction
+    data class CopyClipboardItemToPinned(val id: String) : ImeUiAction
+    data class DeleteClipboardItemInTab(val tab: ClipboardFilterTab, val id: String) : ImeUiAction
+    data class ClearClipboardTab(val tab: ClipboardFilterTab) : ImeUiAction
+    data class SaveCurrentTextToClipboardTab(val tab: ClipboardFilterTab) : ImeUiAction
     data object EnableClipboard : ImeUiAction
     data object OpenClipboardSettings : ImeUiAction
 }

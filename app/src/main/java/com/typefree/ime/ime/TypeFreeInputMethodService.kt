@@ -36,6 +36,7 @@ import com.typefree.core.ime.coordinator.DirectCommandType
 import com.typefree.ime.commit.AndroidCommitExecutor
 import com.typefree.ime.ime.engine.CodetableEnhancedInputEngine
 import com.typefree.ime.ime.engine.RimeDeploymentState
+import com.typefree.ime.ime.clipboard.ClipboardFilterTab
 import com.typefree.ime.network.AiPipelineEngine
 import com.typefree.ime.ui.AppDestinations
 import com.typefree.ime.ui.theme.TypeFreeTheme
@@ -72,8 +73,9 @@ class TypeFreeInputMethodService : ComposeInputMethodService(), ImeHostCallbacks
 
     private var clipboardManager: ClipboardManager? = null
     private var lastObservedSystemClip: String? = null
+    private var lastObservedSystemClipTimestamp: Long = 0L
     private val primaryClipListener = ClipboardManager.OnPrimaryClipChangedListener {
-        syncSystemClipboardIfNeeded(allowFreshBanner = true)
+        syncSystemClipboardInternal(allowFreshBanner = true, fromSystemChangeEvent = true)
     }
 
     private val undoStack = ArrayDeque<UndoSnapshot>()
@@ -675,6 +677,8 @@ class TypeFreeInputMethodService : ComposeInputMethodService(), ImeHostCallbacks
         val settings by repository.settings.collectAsState()
         val uiState by imeState.collectAsState()
         val clipboardItems by repository.clipboardItems.collectAsState()
+        val pinnedClipboardItems by repository.clipboardPinnedItems.collectAsState()
+        val smartClipboardItems by repository.clipboardSmartItems.collectAsState()
         val amplitudes by audioRecorder.amplitudes.collectAsState()
         val elapsedMs by audioRecorder.elapsedMs.collectAsState()
         val didPauseMedia by audioRecorder.didPauseExternalMedia.collectAsState()
@@ -735,6 +739,8 @@ class TypeFreeInputMethodService : ComposeInputMethodService(), ImeHostCallbacks
                     elapsedMs = elapsedMs,
                     didPauseMedia = didPauseMedia,
                     clipboardItems = clipboardItems,
+                    pinnedClipboardItems = pinnedClipboardItems,
+                    smartClipboardItems = smartClipboardItems,
                     onAction = ::handleImeUiAction
                 )
             }
@@ -859,6 +865,10 @@ class TypeFreeInputMethodService : ComposeInputMethodService(), ImeHostCallbacks
             is ImeUiAction.DeleteClipboardItem -> deleteClipboardEntry(action.id)
             ImeUiAction.ClearUnpinnedClipboard -> clearUnpinnedClipboardEntries()
             ImeUiAction.SaveSelectionToClipboard -> saveCurrentSelectionToClipboard()
+            is ImeUiAction.CopyClipboardItemToPinned -> copyClipboardEntryToPinned(action.id)
+            is ImeUiAction.DeleteClipboardItemInTab -> deleteClipboardEntryInTab(action.tab, action.id)
+            is ImeUiAction.ClearClipboardTab -> clearClipboardEntriesInTab(action.tab)
+            is ImeUiAction.SaveCurrentTextToClipboardTab -> saveCurrentTextToClipboardTab(action.tab)
             ImeUiAction.EnableClipboard -> enableClipboardFromKeyboard()
             ImeUiAction.OpenClipboardSettings -> openClipboardPreferencesInHostApp()
         }
@@ -1318,6 +1328,13 @@ class TypeFreeInputMethodService : ComposeInputMethodService(), ImeHostCallbacks
     // -------------------------------------------------------------------------
 
     override fun syncSystemClipboardIfNeeded(allowFreshBanner: Boolean) {
+        syncSystemClipboardInternal(allowFreshBanner = allowFreshBanner, fromSystemChangeEvent = false)
+    }
+
+    private fun syncSystemClipboardInternal(
+        allowFreshBanner: Boolean,
+        fromSystemChangeEvent: Boolean
+    ) {
         if (_imeState.value.isIncognitoMode) return
         val currentSettings = repository.settings.value
         if (!currentSettings.clipboardEnabled) return
@@ -1341,10 +1358,23 @@ class TypeFreeInputMethodService : ComposeInputMethodService(), ImeHostCallbacks
             clip.getItemAt(0)?.coerceToText(this)?.toString().orEmpty()
         }.getOrDefault("")
         val normalized = rawText.trim()
-        if (normalized.isEmpty()) return
-
-        if (normalized == lastObservedSystemClip) return
+        val clipTimestampMs = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            runCatching { clip.description?.timestamp ?: 0L }.getOrDefault(0L)
+        } else {
+            0L
+        }
+        if (!AppRepository.shouldAcceptSystemClipboardSnapshot(
+                normalizedText = normalized,
+                clipTimestampMs = clipTimestampMs,
+                lastObservedText = lastObservedSystemClip,
+                lastObservedTimestampMs = lastObservedSystemClipTimestamp,
+                fromSystemChangeEvent = fromSystemChangeEvent
+            )
+        ) {
+            return
+        }
         lastObservedSystemClip = normalized
+        lastObservedSystemClipTimestamp = clipTimestampMs
 
         val savedEntry = repository.recordClipboardText(rawText) ?: return
         if (allowFreshBanner && currentSettings.clipboardQuickPasteSuggestion && !_imeState.value.isClipboardOpen) {
@@ -1488,15 +1518,63 @@ class TypeFreeInputMethodService : ComposeInputMethodService(), ImeHostCallbacks
         val selected = readSelectedTextSafely().ifBlank { _imeState.value.rawSelectedText }
         if (selected.isBlank()) return
         performKeyFeedback(strong = true)
-        lastObservedSystemClip = selected.trim()
-        repository.recordClipboardText(selected, pinned = true)
-        showQuickActionToast("📌 已存为置顶常用语")
+        repository.addPinnedClipboardPhrase(selected)
+        showQuickActionToast("📌 已存入「常用」")
+    }
+
+    private fun copyClipboardEntryToPinned(id: String) {
+        performKeyFeedback(strong = false)
+        val saved = repository.copyAllClipboardItemToPinned(id)
+        if (saved != null) {
+            showQuickActionToast("📌 已存入「常用」")
+        }
+    }
+
+    private fun deleteClipboardEntryInTab(tab: ClipboardFilterTab, id: String) {
+        performKeyFeedback(strong = false)
+        repository.deleteClipboardItemInTab(tab, id)
+        if (tab == ClipboardFilterTab.ALL && _imeState.value.freshClipboardBannerItem?.id == id) {
+            freshClipBannerJob?.cancel()
+            _imeState.update { it.copy(freshClipboardBannerItem = null) }
+        }
+    }
+
+    private fun clearClipboardEntriesInTab(tab: ClipboardFilterTab) {
+        performKeyFeedback(strong = true)
+        repository.clearClipboardTab(tab)
+        if (tab == ClipboardFilterTab.ALL) {
+            freshClipBannerJob?.cancel()
+            _imeState.update { it.copy(freshClipboardBannerItem = null) }
+        }
+        val label = when (tab) {
+            ClipboardFilterTab.ALL -> "全部"
+            ClipboardFilterTab.PINNED -> "常用"
+            ClipboardFilterTab.SMART -> "提取"
+        }
+        showQuickActionToast("✓ 已清空「$label」")
+    }
+
+    private fun saveCurrentTextToClipboardTab(tab: ClipboardFilterTab) {
+        val candidate = readSelectedTextSafely().trim()
+            .ifBlank { readFullEditorTextSafely().trim() }
+            .ifBlank { _imeState.value.rawSelectedText.trim() }
+            .ifBlank { _imeState.value.currentEditorText.trim() }
+        if (candidate.isBlank()) return
+        performKeyFeedback(strong = true)
+        if (tab == ClipboardFilterTab.SMART) {
+            repository.addSmartClipboardEntry(candidate)
+            showQuickActionToast("✨ 已存入「提取」")
+        } else {
+            repository.addPinnedClipboardPhrase(candidate)
+            showQuickActionToast("📌 已存入「常用」")
+        }
     }
 
     private fun enableClipboardFromKeyboard() {
         performKeyFeedback(strong = false)
         repository.updateSettings { it.copy(clipboardEnabled = true) }
         lastObservedSystemClip = null
+        lastObservedSystemClipTimestamp = 0L
         syncSystemClipboardIfNeeded(allowFreshBanner = false)
     }
 
