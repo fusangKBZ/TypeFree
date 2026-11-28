@@ -1524,9 +1524,10 @@ class TypeFreeInputMethodService : ComposeInputMethodService(), ImeHostCallbacks
 
     private fun copyClipboardEntryToPinned(id: String) {
         performKeyFeedback(strong = false)
-        val saved = repository.copyAllClipboardItemToPinned(id)
-        if (saved != null) {
-            showQuickActionToast("📌 已存入「常用」")
+        when (repository.toggleClipboardItemInPinned(id)) {
+            true -> showQuickActionToast("📌 已存入「常用」")
+            false -> showQuickActionToast("已取消常用")
+            null -> Unit
         }
     }
 

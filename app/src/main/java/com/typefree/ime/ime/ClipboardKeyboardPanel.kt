@@ -442,7 +442,7 @@ fun ClipboardKeyboardPanel(
                             ClipboardItemCard(
                                 entry = entry,
                                 nowMs = nowMs,
-                                showPinAction = activeTab != ClipboardFilterTab.PINNED,
+                                showPinAction = true,
                                 isAlreadyInPinned = activeTab == ClipboardFilterTab.PINNED || entry.text in pinnedTextSet,
                                 onPasteFull = { onPasteText(entry.text) },
                                 onPasteExtracted = { token -> onPasteText(token) },
@@ -920,7 +920,7 @@ private fun ClipboardItemCard(
                     ) {
                         Icon(
                             imageVector = TypeFreeIcons.Pin,
-                            contentDescription = "存入常用",
+                            contentDescription = if (isAlreadyInPinned) "取消常用" else "存入常用",
                             tint = if (isAlreadyInPinned) TypeFreeAmber else palette.keyTextMuted,
                             modifier = Modifier.size(12.5.dp)
                         )

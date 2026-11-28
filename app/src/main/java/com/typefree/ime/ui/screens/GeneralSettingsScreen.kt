@@ -533,25 +533,26 @@ fun GeneralSettingsScreen(
                                         modifier = Modifier.weight(1f)
                                     )
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        if (selectedClipboardTab != ClipboardFilterTab.PINNED) {
-                                            IconButton(
-                                                onClick = {
-                                                    repository.copyAllClipboardItemToPinned(item.id)
-                                                    Toast.makeText(
-                                                        context,
-                                                        AppStrings.pick(appLang, "已存入「常用」", "Copied to Pinned", "已存入「常用」"),
-                                                        Toast.LENGTH_SHORT
-                                                    ).show()
-                                                },
-                                                modifier = Modifier.size(30.dp)
-                                            ) {
-                                                Icon(
-                                                    imageVector = TypeFreeIcons.Pin,
-                                                    contentDescription = tr("存入常用", "Copy to Pinned", "存入常用"),
-                                                    tint = if (isAlreadyPinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                                    modifier = Modifier.size(16.dp)
-                                                )
-                                            }
+                                        IconButton(
+                                            onClick = {
+                                                val pinnedNow = repository.toggleClipboardItemInPinned(item.id)
+                                                if (pinnedNow != null) {
+                                                    val msg = if (pinnedNow) {
+                                                        AppStrings.pick(appLang, "已存入「常用」", "Added to Pinned", "已存入「常用」")
+                                                    } else {
+                                                        AppStrings.pick(appLang, "已取消常用", "Removed from Pinned", "已取消常用")
+                                                    }
+                                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                                }
+                                            },
+                                            modifier = Modifier.size(30.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = TypeFreeIcons.Pin,
+                                                contentDescription = if (isAlreadyPinned) tr("取消常用", "Unpin", "取消常用") else tr("存入常用", "Pin", "存入常用"),
+                                                tint = if (isAlreadyPinned) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(16.dp)
+                                            )
                                         }
                                         IconButton(
                                             onClick = { repository.deleteClipboardItemInTab(selectedClipboardTab, item.id) },

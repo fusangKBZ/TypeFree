@@ -131,6 +131,7 @@ class AppRepository(
         val raw = publicStore.getString(KEY_SETTINGS, null)
         if (raw == null) {
             publicStore.putBoolean(KEY_MIGRATED_V340_COMPACT_4ROW_AND_LIFT, true)
+            publicStore.putBoolean(KEY_MIGRATED_DISABLE_TAP_KEY_POPUP, true)
             if (com.typefree.ime.BuildConfig.IS_XIAOHE_FLAVOR) {
                 publicStore.putBoolean(KEY_MIGRATED_V360_XIAOHE_SCHEME, true)
             }
@@ -200,10 +201,13 @@ class AppRepository(
             } else {
                 rawQwertyShowNumberRow
             }
-            val resolvedQwertyKeyPopupPreview = if (raw.contains("\"qwertyKeyPopupPreview\"")) {
+            val migratedDisableTapPopup = publicStore.getBoolean(KEY_MIGRATED_DISABLE_TAP_KEY_POPUP, false)
+            val resolvedQwertyKeyPopupPreview = if (!migratedDisableTapPopup) {
+                false
+            } else if (raw.contains("\"qwertyKeyPopupPreview\"")) {
                 parsed.qwertyKeyPopupPreview
             } else {
-                true
+                false
             }
             val resolvedClipboardEnabled = if (raw.contains("\"clipboardEnabled\"")) {
                 parsed.clipboardEnabled
@@ -607,7 +611,7 @@ class AppRepository(
                 dictionary = safeDict
             )
             val hydrated = secretVault.hydrateSettingsWithSecrets(preliminary)
-            if (SecretVault.containsPlaintextSecrets(preliminary) || !migratedV340CompactLift || !migratedXiaoheScheme) {
+            if (SecretVault.containsPlaintextSecrets(preliminary) || !migratedV340CompactLift || !migratedXiaoheScheme || !migratedDisableTapPopup) {
                 secretVault.saveSecretsFromSettings(hydrated)
                 val sanitized = secretVault.stripSecretsForPublicPersistence(hydrated)
                 publicStore.putString(KEY_SETTINGS, gson.toJson(sanitized))
@@ -616,6 +620,9 @@ class AppRepository(
                 }
                 if (!migratedXiaoheScheme) {
                     publicStore.putBoolean(KEY_MIGRATED_V360_XIAOHE_SCHEME, true)
+                }
+                if (!migratedDisableTapPopup) {
+                    publicStore.putBoolean(KEY_MIGRATED_DISABLE_TAP_KEY_POPUP, true)
                 }
             }
             hydrated
@@ -802,6 +809,27 @@ class AppRepository(
             ?: _clipboardSmartItems.value.firstOrNull { it.id == id }
             ?: return null
         return addPinnedClipboardPhrase(source.text)
+    }
+
+    /**
+     * Toggles whether the entry referenced by [id] (from ALL, SMART, or PINNED) lives in PINNED.
+     * Returns `true` when added to PINNED, `false` when removed from PINNED, or `null` if missing.
+     * Never deletes records from ALL or SMART.
+     */
+    fun toggleClipboardItemInPinned(id: String): Boolean? {
+        val source = _clipboardItems.value.firstOrNull { it.id == id }
+            ?: _clipboardSmartItems.value.firstOrNull { it.id == id }
+            ?: _clipboardPinnedItems.value.firstOrNull { it.id == id }
+            ?: return null
+        val alreadyPinned = _clipboardPinnedItems.value.any { it.text == source.text }
+        return if (alreadyPinned) {
+            val updated = _clipboardPinnedItems.value.filterNot { it.text == source.text }
+            saveClipboardBucket(_clipboardPinnedItems, KEY_CLIPBOARD_PINNED, updated)
+            false
+        } else {
+            addPinnedClipboardPhrase(source.text)
+            true
+        }
     }
 
     fun deleteClipboardItemInTab(tab: ClipboardFilterTab, id: String) {
@@ -1226,6 +1254,7 @@ class AppRepository(
         private const val KEY_MIGRATED_V30_LIVE_WRITE_DEFAULT = "migrated_v30_live_write_default"
         internal const val KEY_MIGRATED_V340_COMPACT_4ROW_AND_LIFT = "mig_v340_compact_4row_and_lift"
         internal const val KEY_MIGRATED_V360_XIAOHE_SCHEME = "mig_v360_xiaohe_scheme"
+        internal const val KEY_MIGRATED_DISABLE_TAP_KEY_POPUP = "mig_disable_tap_key_popup_v1"
         internal const val KEY_DAILY_STATS_BACKFILLED = "daily_stats_backfilled_v1"
         private const val MAX_HISTORY_ITEMS = 200
         private const val MAX_CLIPBOARD_UNPINNED = 200

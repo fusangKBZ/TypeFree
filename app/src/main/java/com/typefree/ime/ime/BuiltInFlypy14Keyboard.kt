@@ -154,7 +154,7 @@ fun BuiltInFlypy14Keyboard(
     onStopVoiceDictation: () -> Unit = {},
     onSwitchSystemIme: () -> Unit,
     inputSessionToken: Int = 0,
-    showKeyPopupPreview: Boolean = true,
+    showKeyPopupPreview: Boolean = false,
     onSwipeUpPeriodSlash: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -183,6 +183,7 @@ fun BuiltInFlypy14Keyboard(
         keyPosInWindow: Offset,
         keySize: IntSize
     ): Long {
+        if (!showKeyPopupPreview && !isHighlighted) return 0L
         val token = ++previewSeq
         val centerXInRoot = (keyPosInWindow.x - rootPosInWindow.x) + keySize.width / 2f
         val keyTopInRoot = keyPosInWindow.y - rootPosInWindow.y
@@ -620,7 +621,7 @@ fun BuiltInFlypy14Keyboard(
         }
 
         val preview = activeKeyPreview
-        if (showKeyPopupPreview && preview != null && rootSizePx.width > 0) {
+        if (preview != null && (showKeyPopupPreview || preview.isHighlighted) && rootSizePx.width > 0) {
             Flypy14KeyMagnifierBubble(
                 preview = preview,
                 rootWidthPx = rootSizePx.width

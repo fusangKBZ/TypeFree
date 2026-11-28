@@ -1,6 +1,7 @@
 package com.typefree.ime.ime
 
 import com.typefree.ime.data.AppRepository
+import com.typefree.ime.data.AppSettings
 import com.typefree.ime.data.ClipboardEntry
 import com.typefree.ime.data.InMemoryKeyValueStore
 import com.typefree.ime.data.JvmAesGcmCipher
@@ -190,5 +191,57 @@ class ClipboardManagerTest {
         assertTrue(repo.clipboardItems.value.isEmpty())
         assertEquals(1, repo.clipboardPinnedItems.value.size)
         assertEquals("上海市浦东新区张江路88号", repo.clipboardPinnedItems.value[0].text)
+    }
+
+    @Test
+    fun `toggleClipboardItemInPinned toggles pin state without deleting ALL or SMART`() {
+        val store = InMemoryKeyValueStore()
+        val repo = AppRepository(
+            appContext = null,
+            publicStore = store,
+            secretVault = SecretVault(InMemoryKeyValueStore(), JvmAesGcmCipher())
+        )
+        val sms = repo.recordClipboardText("验证码 952711，请在 5 分钟内输入", pinned = false, nowMs = 100L)!!
+        assertTrue(repo.clipboardPinnedItems.value.isEmpty())
+
+        // 1. First tap on 📌 in ALL -> pins to PINNED (returns true)
+        assertEquals(true, repo.toggleClipboardItemInPinned(sms.id))
+        assertEquals(1, repo.clipboardPinnedItems.value.size)
+
+        // 2. Second tap on 📌 in ALL -> cancels pin in PINNED (returns false), leaves ALL & SMART intact
+        assertEquals(false, repo.toggleClipboardItemInPinned(sms.id))
+        assertTrue(repo.clipboardPinnedItems.value.isEmpty())
+        assertEquals(1, repo.clipboardItems.value.size)
+        assertEquals(1, repo.clipboardSmartItems.value.size)
+
+        // 3. Pin again, then tap 📌 on the PINNED entry itself -> removes from PINNED without touching ALL
+        assertEquals(true, repo.toggleClipboardItemInPinned(sms.id))
+        val pinnedEntryId = repo.clipboardPinnedItems.value.first().id
+        assertEquals(false, repo.toggleClipboardItemInPinned(pinnedEntryId))
+        assertTrue(repo.clipboardPinnedItems.value.isEmpty())
+        assertEquals(1, repo.clipboardItems.value.size)
+    }
+
+    @Test
+    fun `qwertyKeyPopupPreview defaults to false and migrates legacy true off once`() {
+        assertFalse(AppSettings().qwertyKeyPopupPreview)
+
+        val store = InMemoryKeyValueStore()
+        store.putString(AppRepository.KEY_SETTINGS, """{"qwertyKeyPopupPreview":true}""")
+        val firstBootRepo = AppRepository(
+            appContext = null,
+            publicStore = store,
+            secretVault = SecretVault(InMemoryKeyValueStore(), JvmAesGcmCipher())
+        )
+        assertFalse(firstBootRepo.settings.value.qwertyKeyPopupPreview)
+
+        // User can explicitly re-enable it afterward and it stays true
+        firstBootRepo.updateSettings { it.copy(qwertyKeyPopupPreview = true) }
+        val secondBootRepo = AppRepository(
+            appContext = null,
+            publicStore = store,
+            secretVault = SecretVault(InMemoryKeyValueStore(), JvmAesGcmCipher())
+        )
+        assertTrue(secondBootRepo.settings.value.qwertyKeyPopupPreview)
     }
 }

@@ -486,7 +486,7 @@ data class AppSettings(
     val lastKeyboardTab: String = "QWERTY",
     val lastQwertyIsChinese: Boolean = true,
     val qwertyShowNumberRow: Boolean = false,
-    val qwertyKeyPopupPreview: Boolean = true,
+    val qwertyKeyPopupPreview: Boolean = false,
     val backspaceSwipeUpClearEnabled: Boolean = false,
     val clipboardEnabled: Boolean = true,
     val clipboardQuickPasteSuggestion: Boolean = true,
